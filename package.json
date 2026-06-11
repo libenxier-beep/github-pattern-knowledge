@@ -1,0 +1,35 @@
+{
+  "name": "github-pattern-knowledge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Markdown-first GitHub engineering pattern knowledge base for Codex and programming agents.",
+  "scripts": {
+    "dev": "vite",
+    "daily": "tsx src/cli/daily.ts",
+    "seed": "tsx src/cli/seed.ts",
+    "index": "tsx src/cli/indexes.ts",
+    "harness": "tsx src/cli/harness.ts",
+    "scheduler": "tsx src/cli/scheduler.ts",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "lucide-react": "^0.556.0",
+    "node-cron": "^4.2.1",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.7",
+    "vitest": "^4.0.15"
+  }
+}
