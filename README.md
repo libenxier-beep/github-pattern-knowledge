@@ -40,7 +40,7 @@ Every accepted pattern note is Markdown with YAML frontmatter. Required frontmat
 - `id`, `name`, `summary`
 - `engineering_problems`, `project_types`, `pattern_types`
 - `complexity`, `quality_score`
-- `source_repos[].repo`, `source_repos[].url`, `source_repos[].reference_files`
+- `source_repos[].repo`, `source_repos[].url`, concrete `source_repos[].commit`, and 2-4 `source_repos[].reference_files`
 - `use_when`, `avoid_when`, `tradeoffs`, `transfer_targets`
 - `created_at`, `updated_at`, `run_id`
 
@@ -56,7 +56,10 @@ Every body must include:
 - `Simpler Alternatives`
 - `Transfer Guidance`
 - `Implementation Hint`
+- `Evidence Table`
 - `Source Evidence`
+
+The evidence path is deliberately stricter than a normal summary. `Evidence Table` must list each reference file, the observed structure in that file, concrete functions/classes/tests/modules/config keys, and why that evidence supports the pattern. `Source Evidence` must name the repo and concrete commit so an agent can reopen the stored snapshot before applying the pattern.
 
 ## Taxonomy
 
@@ -78,7 +81,7 @@ npm install
 Optional GitHub token:
 
 ```bash
-export GITHUB_TOKEN=ghp_your_token
+export GITHUB_TOKEN=your_github_token_here
 ```
 
 Without a token, the tool uses unauthenticated GitHub REST API limits. If GitHub discovery or ingestion fails, `npm run daily` falls back to a clearly marked fixture run.
@@ -90,6 +93,7 @@ npm run daily
 npm run seed -- --list
 npm run seed -- --limit 3
 npm run daily -- --fixture
+npm run evidence
 npm run index
 npm run harness
 npm run dev
@@ -106,7 +110,7 @@ npm run build
 4. ingest README, metadata, tree summary, and selected key files
 5. write a source snapshot
 6. extract 1-3 pattern drafts with the heuristic extractor
-7. run harness
+7. run evidence and source-traceability checks in the harness
 8. write accepted pattern notes
 9. write rejected drafts with failure reasons
 10. regenerate all indexes
@@ -118,6 +122,8 @@ npm run build
 `npm run seed -- --limit 3` processes up to three pending seed repos. Successful repos are recorded in `registry/learned_repos.json`; failed repos stay pending and are not skipped later.
 
 The current seed pool lives in `registry/seed_repos.json` and contains the user-provided 60-repo list. The learned registry prevents daily discovery and seed ingestion from re-learning repos that already produced accepted pattern notes.
+
+`npm run evidence` upgrades existing pattern notes from stored source snapshots. It resolves missing commits when possible, rewrites `Evidence Table`, tightens `Source Evidence`, and keeps old pattern notes from passing only because their Markdown shape is correct.
 
 ## Indexes
 
@@ -138,7 +144,7 @@ npm run harness
 npm run harness -- knowledge/patterns/pattern-plugin-system-capability-lifecycle-registry.md
 ```
 
-The harness checks frontmatter completeness, taxonomy values, filename/id consistency, required sections, source repo traceability, reference files, content specificity, and generic banned phrases.
+The harness checks frontmatter completeness, taxonomy values, filename/id consistency, required sections, source repo traceability, concrete commit refs, 2-4 reference files, evidence-table rows for each file, content specificity, and generic banned phrases.
 
 Accepted drafts enter `knowledge/patterns/`. Failed drafts go to `knowledge/rejected/patterns/` with JSON failure metadata.
 
@@ -168,7 +174,7 @@ See `docs/skill-reference.md` for how this repository references the skill. Use 
 
 The MVP includes:
 
-- `HeuristicExtractor`: deterministic fallback that uses repo metadata, tree paths, README, selected files, docs/tests/examples signals, and concrete reference files.
+- `HeuristicExtractor`: deterministic fallback that uses repo metadata, tree paths, README, selected files, docs/tests/examples signals, concrete reference files, and evidence tables.
 - `PatternExtractor` interface: future LLM extractors can implement this without changing the daily pipeline.
 - `src/extraction/prompts/pattern_extraction.md`: prompt contract for future LLM extraction.
 

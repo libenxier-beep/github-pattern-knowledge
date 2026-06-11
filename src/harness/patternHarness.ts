@@ -35,6 +35,7 @@ const REQUIRED_SECTIONS = [
   "Simpler Alternatives",
   "Transfer Guidance",
   "Implementation Hint",
+  "Evidence Table",
   "Source Evidence"
 ];
 
@@ -111,6 +112,54 @@ function validateProgressiveDisclosureSection(content: string, errors: string[])
   for (const phrase of requiredPhrases) {
     if (!content.includes(phrase)) {
       errors.push(`Progressive Disclosure section must include ${phrase}`);
+    }
+  }
+}
+
+function validCommitRef(value: unknown): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+  return /^[a-f0-9]{40}$/i.test(value) || /^fixture-[a-z0-9-]+$/i.test(value);
+}
+
+function validateEvidenceTable(content: string, referenceFiles: string[], errors: string[]): void {
+  const requiredLabels = ["Reference file", "Observed structure", "Concrete names", "Why it supports"];
+  for (const label of requiredLabels) {
+    if (!content.includes(label)) {
+      errors.push(`Evidence Table must include ${label}`);
+    }
+  }
+
+  for (const ref of referenceFiles) {
+    if (!content.includes(ref)) {
+      errors.push(`Evidence Table must mention reference file: ${ref}`);
+      continue;
+    }
+    const row = content
+      .split(/\r?\n/)
+      .find((line) => line.includes(ref) && line.includes("|"));
+    if (!row) {
+      errors.push(`Evidence Table must include a table row for reference file: ${ref}`);
+      continue;
+    }
+    const cells = row
+      .split("|")
+      .map((cell) => cell.trim())
+      .filter(Boolean);
+    if (cells.length < 4) {
+      errors.push(`Evidence Table row for ${ref} must include observed structure, concrete names, and support rationale`);
+      continue;
+    }
+    const [, observed, concrete, supports] = cells;
+    if (!observed || observed.length < 24) {
+      errors.push(`Evidence Table observed structure for ${ref} must be specific`);
+    }
+    if (!concrete || concrete.length < 8 || !/[`A-Za-z0-9_().:-]/.test(concrete)) {
+      errors.push(`Evidence Table concrete names for ${ref} must cite functions, classes, tests, modules, or config keys`);
+    }
+    if (!supports || supports.length < 32) {
+      errors.push(`Evidence Table support rationale for ${ref} must explain why the evidence supports the pattern`);
     }
   }
 }
@@ -205,8 +254,19 @@ export function validatePatternMarkdown(fileName: string, markdown: string, taxo
       if (typeof source.url !== "string" || source.url.length < 8) {
         errors.push(`source_repos[${index}].url must be present`);
       }
-      if (!Array.isArray(source.reference_files) || source.reference_files.length === 0) {
-        errors.push(`source_repos[${index}].reference_files must include at least one file`);
+      if (!validCommitRef(source.commit)) {
+        errors.push(`source_repos[${index}].commit must be a concrete commit SHA or fixture commit id`);
+      }
+      if (!Array.isArray(source.reference_files) || source.reference_files.length < 2) {
+        errors.push(`source_repos[${index}].reference_files must include at least two files`);
+      } else if (source.reference_files.length > 4) {
+        errors.push(`source_repos[${index}].reference_files must include no more than four files`);
+      } else {
+        source.reference_files.forEach((file, fileIndex) => {
+          if (typeof file !== "string" || file.trim().length < 3) {
+            errors.push(`source_repos[${index}].reference_files[${fileIndex}] must be a concrete file path`);
+          }
+        });
       }
     });
   }
@@ -229,14 +289,25 @@ export function validatePatternMarkdown(fileName: string, markdown: string, taxo
     validateProgressiveDisclosureSection(progressiveDisclosure, errors);
   }
 
-  const sourceEvidence = sectionContent(body, "Source Evidence");
   const sourceRepos = Array.isArray(frontmatter.source_repos) ? frontmatter.source_repos : [];
+  const evidenceTable = sectionContent(body, "Evidence Table");
+  const referenceFiles = sourceRepos.flatMap((source) => (Array.isArray(source.reference_files) ? source.reference_files : []));
+  if (evidenceTable) {
+    validateEvidenceTable(evidenceTable, referenceFiles, errors);
+  } else {
+    for (const ref of referenceFiles) {
+      errors.push(`Evidence Table must mention reference file: ${ref}`);
+    }
+  }
+
+  const sourceEvidence = sectionContent(body, "Source Evidence");
   const evidenceMentionsSource = sourceRepos.some((source) => {
     const refs = Array.isArray(source.reference_files) ? source.reference_files : [];
-    return sourceEvidence.includes(source.repo) || refs.some((ref) => sourceEvidence.includes(ref));
+    const commit = typeof source.commit === "string" ? source.commit : "";
+    return (sourceEvidence.includes(source.repo) || refs.some((ref) => sourceEvidence.includes(ref))) && (commit ? sourceEvidence.includes(commit) : false);
   });
   if (!evidenceMentionsSource) {
-    errors.push("Source Evidence must mention the source repo or a reference file");
+    errors.push("Source Evidence must mention the source repo or a reference file plus the concrete commit");
   }
 
   for (const phrase of FORBIDDEN_PHRASES) {

@@ -9,6 +9,7 @@ describe("heuristic extractor with seed focus", () => {
       repo: "kubernetes/kubernetes",
       url: "https://github.com/kubernetes/kubernetes",
       default_branch: "master",
+      commit_sha: "abcdef1234567890abcdef1234567890abcdef12",
       fixture: false,
       metadata: {
         stars: 100000,
@@ -28,7 +29,13 @@ describe("heuristic extractor with seed focus", () => {
         {
           path: "pkg/controller/controller_utils.go",
           reason: "controller and reconciliation evidence",
-          content: "controller sync reconcile workqueue",
+          content: "type Controller struct {}\nfunc (c *Controller) syncHandler() {}\nfunc reconcile() {}\nworkqueue.NewNamedRateLimitingQueue()",
+          truncated: false
+        },
+        {
+          path: "pkg/controller/controller_utils_test.go",
+          reason: "test verifies controller reconciliation behavior",
+          content: "func TestControllerSyncHandler(t *testing.T) { reconcile(); }",
           truncated: false
         }
       ],
@@ -44,10 +51,15 @@ describe("heuristic extractor with seed focus", () => {
     expect(draft.frontmatter.id).toContain("reconciliation");
     expect(draft.frontmatter.engineering_problems).toContain("state_management");
     expect(draft.frontmatter.pattern_types).toContain("state_machine");
+    expect(draft.frontmatter.source_repos[0].commit).toBe("abcdef1234567890abcdef1234567890abcdef12");
+    expect(draft.frontmatter.source_repos[0].reference_files.length).toBeGreaterThanOrEqual(2);
     expect(draft.body).toContain("## Progressive Disclosure");
     expect(draft.body).toContain("10-second triage");
     expect(draft.body).toContain("2-minute transfer check");
     expect(draft.body).toContain("## Retrieval Tags");
+    expect(draft.body).toContain("## Evidence Table");
+    expect(draft.body).toContain("pkg/controller/controller_utils.go");
+    expect(draft.body).toContain("syncHandler");
     expect(draft.body).toContain("Problems: `state_management`, `workflow_orchestration`, `error_recovery`");
     expect(draft.body).toContain("Tags: `controller_pattern`, `reconciliation_loop`, `api_boundary`, `declarative_state`, `seed-focus`");
     expect(draft.body).toContain("reconciliation");

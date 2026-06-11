@@ -13,7 +13,7 @@ This repository contains the TypeScript tool and local dashboard. The skill cont
 - how to run seed and daily ingestion
 - how to avoid re-learning repositories already recorded in `registry/learned_repos.json`
 - how to keep human-facing cards separate from agent-readable pattern notes
-- how to maintain retrieval tags, indexes, progressive disclosure, and harness validation
+- how to maintain retrieval tags, indexes, progressive disclosure, evidence tables, concrete commit traceability, and harness validation
 - how to avoid publishing secrets or private generated knowledge data
 
 The knowledge base remains a Work Contexts asset by default. The website repo should not commit `.env.local`, `node_modules`, `dist`, or private generated knowledge data.

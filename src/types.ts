@@ -83,6 +83,7 @@ export type RepoContext = {
   repo: string;
   url: string;
   default_branch: string;
+  commit_sha: string;
   fixture: boolean;
   metadata: RepoMetadata;
   tree_summary: string[];

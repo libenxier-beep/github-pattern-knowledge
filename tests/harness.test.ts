@@ -9,6 +9,8 @@ const taxonomy: Taxonomy = {
   transfer_targets: ["codex_skill_system", "agent_tooling"]
 };
 
+const commitSha = "0123456789abcdef0123456789abcdef01234567";
+
 const validPattern = `---
 id: pattern-plugin-registry-lifecycle-hooks
 name: Plugin registry with lifecycle hooks
@@ -27,9 +29,10 @@ quality_score: 87
 source_repos:
   - repo: owner/project
     url: https://github.com/owner/project
-    commit: unknown
+    commit: ${commitSha}
     reference_files:
       - src/plugins/registry.ts
+      - tests/plugins/registry.test.ts
 use_when:
   - Multiple independently owned capability modules must share a stable lifecycle contract.
 avoid_when:
@@ -96,8 +99,14 @@ First count independently changing modules, then identify lifecycle stages, then
 ## Implementation Hint
 Use a small registry map, a typed plugin contract, and one host-owned function for each lifecycle phase.
 
+## Evidence Table
+| Reference file | Observed structure | Concrete names | Why it supports the pattern |
+| --- | --- | --- | --- |
+| \`src/plugins/registry.ts\` | Defines a registry class that owns capability registration and lifecycle sequencing. | \`CapabilityRegistry\`, \`register\`, \`initializeAll\` | This supports the pattern because lifecycle order is centralized in a host-owned boundary rather than spread across plugin modules. |
+| \`tests/plugins/registry.test.ts\` | Verifies lifecycle order and duplicate capability rejection at the registry boundary. | \`initializes registered capabilities\`, \`duplicate capability\` | This supports the pattern because the extension contract is locked by tests rather than only described in documentation. |
+
 ## Source Evidence
-Evidence comes from owner/project at src/plugins/registry.ts, which centralizes registration and lifecycle sequencing.
+Evidence comes from owner/project at commit ${commitSha}. The concrete files are src/plugins/registry.ts and tests/plugins/registry.test.ts, which show lifecycle sequencing plus contract tests for duplicate registration.
 `;
 
 describe("pattern harness", () => {
@@ -110,14 +119,17 @@ describe("pattern harness", () => {
 
   test("rejects generic pattern notes without source evidence", () => {
     const invalid = validPattern
-      .replace("reference_files:\n      - src/plugins/registry.ts", "reference_files: []")
-      .replace("Evidence comes from owner/project at src/plugins/registry.ts, which centralizes registration and lifecycle sequencing.", "This project structure is clear and worth learning.");
+      .replace(/reference_files:\n      - src\/plugins\/registry\.ts\n      - tests\/plugins\/registry\.test\.ts/, "reference_files: []")
+      .replace(
+        `Evidence comes from owner/project at commit ${commitSha}. The concrete files are src/plugins/registry.ts and tests/plugins/registry.test.ts, which show lifecycle sequencing plus contract tests for duplicate registration.`,
+        "This project structure is clear and worth learning."
+      );
 
     const result = validatePatternMarkdown("pattern-plugin-registry-lifecycle-hooks.md", invalid, taxonomy);
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain("source_repos[0].reference_files must include at least one file");
-    expect(result.errors).toContain("Source Evidence must mention the source repo or a reference file");
+    expect(result.errors).toContain("source_repos[0].reference_files must include at least two files");
+    expect(result.errors).toContain("Source Evidence must mention the source repo or a reference file plus the concrete commit");
   });
 
   test("rejects pattern notes without body retrieval tags", () => {
@@ -136,5 +148,25 @@ describe("pattern harness", () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("missing required section: Progressive Disclosure");
+  });
+
+  test("rejects pattern notes with unknown commit", () => {
+    const invalid = validPattern.replace(`commit: ${commitSha}`, "commit: unknown");
+
+    const result = validatePatternMarkdown("pattern-plugin-registry-lifecycle-hooks.md", invalid, taxonomy);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("source_repos[0].commit must be a concrete commit SHA or fixture commit id");
+  });
+
+  test("rejects pattern notes without evidence table rows for each reference file", () => {
+    const invalid = validPattern.replace(/## Evidence Table[\s\S]*?\n## Source Evidence/, "## Source Evidence");
+
+    const result = validatePatternMarkdown("pattern-plugin-registry-lifecycle-hooks.md", invalid, taxonomy);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("missing required section: Evidence Table");
+    expect(result.errors).toContain("Evidence Table must mention reference file: src/plugins/registry.ts");
+    expect(result.errors).toContain("Evidence Table must mention reference file: tests/plugins/registry.test.ts");
   });
 });

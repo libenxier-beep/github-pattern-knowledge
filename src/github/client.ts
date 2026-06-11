@@ -25,6 +25,10 @@ export type GitHubTreeItem = {
   sha: string;
 };
 
+export type GitHubCommit = {
+  sha: string;
+};
+
 export class GitHubClient {
   private readonly token?: string;
   private readonly baseUrl: string;
@@ -70,6 +74,11 @@ export class GitHubClient {
       `/repos/${fullName}/git/trees/${encodeURIComponent(branch)}?recursive=1`
     );
     return data.tree;
+  }
+
+  async getCommitSha(fullName: string, branch: string): Promise<string> {
+    const data = await this.request<GitHubCommit>(`/repos/${fullName}/commits/${encodeURIComponent(branch)}`);
+    return data.sha;
   }
 
   async getReadme(fullName: string): Promise<string> {

@@ -9,6 +9,7 @@
     "daily": "tsx src/cli/daily.ts",
     "seed": "tsx src/cli/seed.ts",
     "index": "tsx src/cli/indexes.ts",
+    "evidence": "tsx src/cli/evidence.ts",
     "harness": "tsx src/cli/harness.ts",
     "scheduler": "tsx src/cli/scheduler.ts",
     "build": "tsc -b && vite build",

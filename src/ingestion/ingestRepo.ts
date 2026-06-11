@@ -68,6 +68,7 @@ function selectTreeFiles(tree: Array<{ path: string; type: string; size?: number
 export async function ingestRepo(client: GitHubClient, repo: GitHubSearchRepo, runId: string, now = new Date(), seedFocus: string[] = []): Promise<RepoContext> {
   const releasesCount = await client.getReleaseCount(repo.full_name);
   const metadata = toRepoMetadata(repo, releasesCount);
+  const commitSha = await client.getCommitSha(repo.full_name, repo.default_branch);
   const tree = await client.getTree(repo.full_name, repo.default_branch);
   const readme = await client.getReadme(repo.full_name);
   const selected = selectTreeFiles(tree, seedFocus);
@@ -104,6 +105,7 @@ export async function ingestRepo(client: GitHubClient, repo: GitHubSearchRepo, r
     repo: repo.full_name,
     url: repo.html_url,
     default_branch: repo.default_branch,
+    commit_sha: commitSha,
     fixture: false,
     metadata,
     tree_summary: tree.map((item) => item.path).slice(0, 2000),
@@ -145,6 +147,8 @@ export async function writeSourceSnapshot(projectRoot: string, context: RepoCont
     run_id: context.run_id,
     repo: context.repo,
     url: context.url,
+    default_branch: context.default_branch,
+    commit_sha: context.commit_sha,
     fixture: context.fixture,
     metadata: context.metadata,
     tree_summary: context.tree_summary,

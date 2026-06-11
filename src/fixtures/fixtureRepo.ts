@@ -7,6 +7,7 @@ export function createFixtureRepoContext(runId: string, now = new Date()): RepoC
     repo: "fixture/agent-workflow-kit",
     url: "fixture://agent-workflow-kit",
     default_branch: "main",
+    commit_sha: "fixture-agent-workflow-kit",
     fixture: true,
     metadata: {
       stars: 2400,

@@ -7,6 +7,7 @@ const context: RepoContext = {
   repo: "owner/project",
   url: "https://github.com/owner/project",
   default_branch: "main",
+  commit_sha: "1111111111111111111111111111111111111111",
   fixture: false,
   metadata: {
     stars: 4000,

@@ -12,6 +12,37 @@ function seedManifestPath(projectRoot: string): string {
 export async function ensureSeedManifest(projectRoot = process.cwd()): Promise<string> {
   const filePath = seedManifestPath(projectRoot);
   await ensureDir(path.dirname(filePath));
+  const defaultsByRepo = new Map(DEFAULT_SEED_REPOS.map((repo) => [repo.repo, repo]));
+
+  if (await pathExists(filePath)) {
+    const existing = await readJson<{
+      generated_at?: string;
+      source?: string;
+      scoring_hint?: unknown;
+      repos?: SeedRepo[];
+    }>(filePath);
+    const merged = [...(existing.repos ?? [])];
+    const seen = new Set(merged.map((repo) => repo.repo));
+    for (const seed of DEFAULT_SEED_REPOS) {
+      if (!seen.has(seed.repo)) {
+        merged.push(seed);
+      }
+    }
+    merged.sort((a, b) => a.rank - b.rank || a.repo.localeCompare(b.repo));
+    await writeJson(filePath, {
+      generated_at: existing.generated_at ?? new Date().toISOString(),
+      source: existing.source ?? "user-provided GPT-5.5 Pro seed pool, updated replacement list on 2026-06-11",
+      scoring_hint: existing.scoring_hint ?? {
+        engineering_quality: 0.6,
+        long_term_impact: 0.25,
+        recent_heat: 0.15
+      },
+      seed_count: merged.length,
+      repos: merged
+    });
+    return filePath;
+  }
+
   await writeJson(filePath, {
     generated_at: new Date().toISOString(),
     source: "user-provided GPT-5.5 Pro seed pool, updated replacement list on 2026-06-11",
@@ -21,7 +52,7 @@ export async function ensureSeedManifest(projectRoot = process.cwd()): Promise<s
       recent_heat: 0.15
     },
     seed_count: DEFAULT_SEED_REPOS.length,
-    repos: DEFAULT_SEED_REPOS
+    repos: [...defaultsByRepo.values()]
   });
   return filePath;
 }

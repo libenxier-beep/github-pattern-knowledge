@@ -1,5 +1,7 @@
 import type { PatternDraft, PatternFrontmatter, RepoContext, RepoScore } from "../types";
 import type { PatternExtractor } from "./extractor";
+import { extractConcreteNames } from "../knowledge/evidenceNames";
+import { evidenceSupportRationale } from "../knowledge/evidenceText";
 import { localDateString } from "../utils/date";
 import { ensurePatternNavigationSections } from "../knowledge/retrievalTags";
 
@@ -25,6 +27,123 @@ function referenceFiles(context: RepoContext, keywords: string[]): string[] {
     .filter((file) => keywords.some((keyword) => file.path.toLowerCase().includes(keyword)))
     .map((file) => file.path);
   return (selected.length > 0 ? selected : context.selected_files.map((file) => file.path)).slice(0, 4);
+}
+
+type EvidenceRow = {
+  file: string;
+  observedStructure: string;
+  concreteNames: string[];
+  supportRationale: string;
+};
+
+function sourceCommit(context: RepoContext): string {
+  return context.commit_sha || (context.fixture ? `fixture-${context.repo.split("/").pop() ?? "repo"}` : "unknown");
+}
+
+function contentForPath(context: RepoContext, filePath: string): string {
+  const selected = context.selected_files.find((file) => file.path === filePath);
+  if (selected?.content) {
+    return selected.content;
+  }
+  const packageMeta = context.package_metadata.find((file) => file.path === filePath);
+  if (packageMeta?.excerpt) {
+    return packageMeta.excerpt;
+  }
+  if (filePath.toLowerCase() === "readme.md") {
+    return context.readme_excerpt;
+  }
+  return "";
+}
+
+function observedStructure(filePath: string, content: string): string {
+  const lowerPath = filePath.toLowerCase();
+  const lower = content.toLowerCase();
+  if (lowerPath.includes("test") || lowerPath.includes("spec") || /\b(?:test|describe|it)\(/.test(content)) {
+    return "Test file that locks the boundary behavior and makes the claimed pattern checkable instead of only descriptive.";
+  }
+  if (lowerPath.endsWith(".json") || lowerPath.endsWith(".yaml") || lowerPath.endsWith(".yml") || lowerPath.endsWith(".toml")) {
+    return "Configuration or metadata file that exposes the public contract, command surface, schema, or integration boundary.";
+  }
+  if (lower.includes("registry") || lower.includes("register")) {
+    return "Runtime file that defines registration ownership and keeps extension lookup separate from capability implementation.";
+  }
+  if (lower.includes("router") || lower.includes("command") || lower.includes("handler")) {
+    return "Runtime file that maps external commands or requests to handlers through an explicit dispatch boundary.";
+  }
+  if (lower.includes("schema") || lower.includes("validate") || lower.includes("config")) {
+    return "Runtime or documentation file that defines validation rules around a user-facing configuration boundary.";
+  }
+  if (lower.includes("store") || lower.includes("cache") || lower.includes("storage")) {
+    return "Runtime file that separates persistence, cache lookup, or durable state mutation from caller workflow code.";
+  }
+  if (lower.includes("pipeline") || lower.includes("processor") || lower.includes("exporter")) {
+    return "Runtime file that names staged processing responsibilities and separates stage ownership in a data flow.";
+  }
+  return "Selected source file that exposes a named module boundary, exported contract, or operational integration point.";
+}
+
+function buildEvidenceRows(context: RepoContext, keywords: string[], coreNoun: string): EvidenceRow[] {
+  const keywordRefs = referenceFiles(context, keywords);
+  const refs = new Set<string>();
+  for (const ref of keywordRefs) {
+    refs.add(ref);
+  }
+  for (const file of context.selected_files) {
+    if (refs.size >= 4) {
+      break;
+    }
+    if (!refs.has(file.path)) {
+      refs.add(file.path);
+    }
+  }
+  if (refs.size < 2 && context.readme_excerpt) {
+    refs.add("README.md");
+  }
+  const rows = [...refs].slice(0, 4).map((file) => {
+    const content = contentForPath(context, file);
+    const names = extractConcreteNames(content, file);
+    const observed = observedStructure(file, content);
+    return {
+      file,
+      observedStructure: observed,
+      concreteNames: names,
+      supportRationale: evidenceSupportRationale(file, observed, names, coreNoun)
+    };
+  });
+  return rows.length >= 2 ? rows : rows.concat({
+    file: "README.md",
+    observedStructure: "Repository overview that states the public intent and helps cross-check whether the extracted pattern matches the project purpose.",
+    concreteNames: ["README"],
+    supportRationale: `Supports the ${coreNoun} claim only as secondary context; runtime or test evidence should be preferred when available.`
+  }).slice(0, 2);
+}
+
+function escapeTableCell(value: string): string {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
+}
+
+function evidenceTable(rows: EvidenceRow[]): string {
+  const tableRows = rows.map((row) => {
+    const names = row.concreteNames.map((name) => `\`${escapeTableCell(name)}\``).join(", ");
+    return `| \`${escapeTableCell(row.file)}\` | ${escapeTableCell(row.observedStructure)} | ${names} | ${escapeTableCell(row.supportRationale)} |`;
+  });
+  return `## Evidence Table
+| Reference file | Observed structure | Concrete names | Why it supports the pattern |
+| --- | --- | --- | --- |
+${tableRows.join("\n")}`;
+}
+
+function sourceEvidence(context: RepoContext, rows: EvidenceRow[], coreNoun: string): string {
+  const refs = rows.map((row) => row.file);
+  const names = rows.flatMap((row) => row.concreteNames).slice(0, 8);
+  return `## Source Evidence
+The source repo ${context.repo} was inspected at commit ${sourceCommit(context)}. The concrete reference files are ${refs.join(", ")}. The evidence names ${names.map((name) => `\`${name}\``).join(", ")} are the audit handles an agent should reopen before applying this ${coreNoun} pattern to another codebase.`;
+}
+
+function evidenceSections(context: RepoContext, rows: EvidenceRow[], coreNoun: string): string {
+  return `${evidenceTable(rows)}
+
+${sourceEvidence(context, rows, coreNoun)}`;
 }
 
 type FocusPattern = {
@@ -167,7 +286,7 @@ function inferFocusPattern(context: RepoContext): FocusPattern | null {
   return null;
 }
 
-function focusedBody(context: RepoContext, pattern: FocusPattern, refs: string[]): string {
+function focusedBody(context: RepoContext, pattern: FocusPattern, rows: EvidenceRow[]): string {
   return `# ${pattern.bodyTitle}
 
 ## Engineering Problem
@@ -200,8 +319,7 @@ First identify the repeated decision the source repo solved. Then compare module
 ## Implementation Hint
 Start with a small typed interface, one host-owned orchestration function, and tests around the contract. Keep source evidence nearby so future agents can re-check the pattern before applying it.
 
-## Source Evidence
-The source repo ${context.repo} is represented by ${refs.join(", ")}. These files were selected from the repository snapshot as evidence for ${pattern.coreNoun} and should be re-opened before applying the pattern to a new codebase.`;
+${evidenceSections(context, rows, pattern.coreNoun)}`;
 }
 
 function baseFrontmatter(context: RepoContext, score: RepoScore | undefined, runDate: Date, overrides: Partial<PatternFrontmatter>): PatternFrontmatter {
@@ -217,9 +335,9 @@ function baseFrontmatter(context: RepoContext, score: RepoScore | undefined, run
     quality_score: Math.max(60, Math.min(95, score?.engineering_quality.score ?? 72)),
     source_repos: [
       {
-        repo: context.repo,
-        url: context.url,
-        commit: "unknown",
+        repo: overrides.source_repos?.[0]?.repo ?? context.repo,
+        url: overrides.source_repos?.[0]?.url ?? context.url,
+        commit: overrides.source_repos?.[0]?.commit ?? sourceCommit(context),
         reference_files: overrides.source_repos?.[0]?.reference_files ?? referenceFiles(context, ["src", "lib", "package"])
       }
     ],
@@ -247,7 +365,7 @@ function withRetrievalTags(draft: PatternDraft): PatternDraft {
   };
 }
 
-function registryBody(context: RepoContext, refs: string[]): string {
+function registryBody(context: RepoContext, rows: EvidenceRow[]): string {
   return `# Capability registry with lifecycle hooks
 
 ## Engineering Problem
@@ -280,11 +398,10 @@ Count independently changing modules first, then list shared lifecycle phases, t
 ## Implementation Hint
 Use a typed capability contract, a small map keyed by capability id, and one host-owned method per lifecycle phase. Keep dependency injection explicit through the runtime context instead of allowing global imports.
 
-## Source Evidence
-The source repo ${context.repo} exposes this boundary through ${refs.join(", ")}. The selected files show a registry/lifecycle surface and tests or command code that make registration order inspectable.`;
+${evidenceSections(context, rows, "capability registry")}`;
 }
 
-function commandBody(context: RepoContext, refs: string[]): string {
+function commandBody(context: RepoContext, rows: EvidenceRow[]): string {
   return `# Explicit command router table
 
 ## Engineering Problem
@@ -317,11 +434,10 @@ List every command and handler, then check whether command addition requires tou
 ## Implementation Hint
 Represent the command surface as a typed record from command name to handler. Keep argument parsing near the router and workflow-specific validation inside each handler.
 
-## Source Evidence
-The source repo ${context.repo} provides routing evidence in ${refs.join(", ")}. The selected file paths show command routing as a boundary separate from capability or workflow implementation.`;
+${evidenceSections(context, rows, "command router")}`;
 }
 
-function boundaryBody(context: RepoContext, refs: string[]): string {
+function boundaryBody(context: RepoContext, rows: EvidenceRow[]): string {
   return `# Evidence-backed source boundary layout
 
 ## Engineering Problem
@@ -354,8 +470,7 @@ Ask whether an agent can find entry points, contracts, examples, and verificatio
 ## Implementation Hint
 Keep top-level directories boring and explicit: source, tests, docs, examples, generated knowledge, and run metadata. Avoid creating layers that do not own a distinct decision.
 
-## Source Evidence
-The source repo ${context.repo} supplies source-boundary evidence through ${refs.join(", ")} and a tree containing runtime files, tests, docs or examples, and package metadata.`;
+${evidenceSections(context, rows, "source boundary layout")}`;
 }
 
 export class HeuristicExtractor implements PatternExtractor {
@@ -365,7 +480,8 @@ export class HeuristicExtractor implements PatternExtractor {
     const focusPattern = inferFocusPattern(context);
 
     if (focusPattern) {
-      const refs = referenceFiles(context, focusPattern.keywords);
+      const evidence = buildEvidenceRows(context, focusPattern.keywords, focusPattern.coreNoun);
+      const refs = evidence.map((row) => row.file);
       return [
         {
           frontmatter: baseFrontmatter(context, score, runDate, {
@@ -375,19 +491,20 @@ export class HeuristicExtractor implements PatternExtractor {
             engineering_problems: focusPattern.engineering_problems,
             pattern_types: focusPattern.pattern_types,
             transfer_targets: focusPattern.transfer_targets,
-            source_repos: [{ repo: context.repo, url: context.url, commit: "unknown", reference_files: refs }],
+            source_repos: [{ repo: context.repo, url: context.url, commit: sourceCommit(context), reference_files: refs }],
             use_when: focusPattern.use_when,
             avoid_when: focusPattern.avoid_when,
             tradeoffs: focusPattern.tradeoffs,
             tags: [...(context.seed_focus ?? []), "seed-focus"]
           }),
-          body: focusedBody(context, focusPattern, refs)
+          body: focusedBody(context, focusPattern, evidence)
         }
       ].map(withRetrievalTags);
     }
 
     if (includesAny(paths, ["plugin", "registry", "provider", "capabilit", "lifecycle"])) {
-      const refs = referenceFiles(context, ["plugin", "registry", "provider", "capabilit", "lifecycle"]);
+      const evidence = buildEvidenceRows(context, ["plugin", "registry", "provider", "capabilit", "lifecycle"], "capability registry");
+      const refs = evidence.map((row) => row.file);
       drafts.push({
         frontmatter: baseFrontmatter(context, score, runDate, {
           id: "pattern-plugin-system-capability-lifecycle-registry",
@@ -396,18 +513,19 @@ export class HeuristicExtractor implements PatternExtractor {
           engineering_problems: ["plugin_extension", "lifecycle_management", "extensibility"],
           pattern_types: ["registry", "plugin_system", "lifecycle_hooks", "capability_boundary"],
           transfer_targets: ["codex_skill_system", "agent_tooling", "workflow_engine"],
-          source_repos: [{ repo: context.repo, url: context.url, commit: "unknown", reference_files: refs }],
+          source_repos: [{ repo: context.repo, url: context.url, commit: sourceCommit(context), reference_files: refs }],
           use_when: ["Three or more independently changing capabilities need a shared lifecycle without cross-importing each other."],
           avoid_when: ["Only one implementation exists or direct function calls still make the lifecycle easier to inspect."],
           tradeoffs: ["Adds registry state and lifecycle indirection in exchange for extension isolation and testable ordering."],
           tags: ["extension", "lifecycle", "capability-boundary"]
         }),
-        body: registryBody(context, refs)
+        body: registryBody(context, evidence)
       });
     }
 
     if (includesAny(paths, ["command", "router", "cli"])) {
-      const refs = referenceFiles(context, ["command", "router", "cli"]);
+      const evidence = buildEvidenceRows(context, ["command", "router", "cli"], "command router");
+      const refs = evidence.map((row) => row.file);
       drafts.push({
         frontmatter: baseFrontmatter(context, score, runDate, {
           id: "pattern-command-routing-explicit-handler-table",
@@ -416,23 +534,24 @@ export class HeuristicExtractor implements PatternExtractor {
           engineering_problems: ["command_routing", "api_boundary", "developer_experience"],
           pattern_types: ["command_router", "facade"],
           transfer_targets: ["cli_assistant", "local_automation_tool", "agent_tooling"],
-          source_repos: [{ repo: context.repo, url: context.url, commit: "unknown", reference_files: refs }],
+          source_repos: [{ repo: context.repo, url: context.url, commit: sourceCommit(context), reference_files: refs }],
           use_when: ["Several subcommands share one process entry point but should keep independent workflow behavior."],
           avoid_when: ["The tool has a single command or the command surface still changes faster than tests can stabilize it."],
           tradeoffs: ["Adds a dispatch layer in exchange for clearer command ownership and safer new-command additions."],
           tags: ["cli", "routing", "handler-table"]
         }),
-        body: commandBody(context, refs)
+        body: commandBody(context, evidence)
       });
     }
 
     if (drafts.length === 0) {
-      const refs = referenceFiles(context, ["src", "lib", "test", "docs", "package"]);
+      const evidence = buildEvidenceRows(context, ["src", "lib", "test", "docs", "package"], "source boundary layout");
+      const refs = evidence.map((row) => row.file);
       drafts.push({
         frontmatter: baseFrontmatter(context, score, runDate, {
-          source_repos: [{ repo: context.repo, url: context.url, commit: "unknown", reference_files: refs }]
+          source_repos: [{ repo: context.repo, url: context.url, commit: sourceCommit(context), reference_files: refs }]
         }),
-        body: boundaryBody(context, refs)
+        body: boundaryBody(context, evidence)
       });
     }
 
