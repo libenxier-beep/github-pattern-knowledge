@@ -4,7 +4,7 @@ import { writeJson } from "../utils/fs";
 import { getKnowledgePaths, toProjectRelative } from "../utils/paths";
 import { loadTaxonomy } from "../knowledge/taxonomy";
 import { scoreRepoContext } from "../scoring/scoreRepo";
-import { HeuristicExtractor } from "../extraction/heuristicExtractor";
+import { createExtractor } from "../extraction/createExtractor";
 import { writePatternDraft } from "../knowledge/patternWriter";
 import { generateIndexes } from "../indexes/generateIndexes";
 import { generateDailyCard } from "../cards/generateCard";
@@ -30,7 +30,7 @@ export async function processRepoContext(options: ProcessRepoOptions): Promise<D
   const sourceSnapshot = await writeSourceSnapshot(options.projectRoot, options.context);
   const selectedScore =
     options.candidateScores.find((score) => score.selected) ?? { ...scoreRepoContext(options.context, options.runDate), selected: true };
-  const extractor = new HeuristicExtractor();
+  const { extractor } = createExtractor({ taxonomy, projectRoot: options.projectRoot });
   const drafts = await extractor.extractPatterns(options.context, selectedScore, options.runDate);
   const addedPatterns: string[] = [];
   const rejectedPatterns: string[] = [];

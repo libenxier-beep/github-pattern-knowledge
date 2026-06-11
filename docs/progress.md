@@ -23,13 +23,13 @@
 - Knowledge location: `.codex/memories/work_contexts/github_engineering_patterns` because the extracted patterns are durable work-scene knowledge.
 - Tech stack: TypeScript + Node.js + Vite React because the request prioritizes local CLI plus simple dashboard.
 - Storage: Markdown source files plus generated JSON indexes.
-- Extractor: deterministic heuristic extractor first; LLM extractor reserved behind interface and prompt file.
+- Extractor: deterministic heuristic fallback plus LLM extractor/reviewer behind `createExtractor()`.
 - Seed ingestion: successful repos are recorded in `registry/learned_repos.json`; failed or rate-limited repos remain pending.
 
 ## Risks
 
 - GitHub public API can rate-limit unauthenticated runs.
-- Heuristic extraction is intentionally conservative and may miss subtle patterns without LLM support.
+- LLM extraction can still over-abstract if selected evidence is weak; reviewer plus deterministic harness should reject instead of accepting confident prose.
 - The local dashboard is designed for development server usage; it is not a deployed app.
 
 ## Handoff

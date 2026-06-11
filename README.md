@@ -88,6 +88,18 @@ export GITHUB_TOKEN=your_github_token_here
 
 Without a token, the tool uses unauthenticated GitHub REST API limits. If GitHub discovery or ingestion fails, `npm run daily` falls back to a clearly marked fixture run.
 
+Optional LLM extraction:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key_here
+export EXTRACTOR_MODE=auto        # auto | heuristic | llm
+export OPENAI_MODEL=gpt-5.5
+export OPENAI_REASONING_EFFORT=medium
+export LLM_REVIEW=1
+```
+
+`EXTRACTOR_MODE=auto` is the default. In auto mode, the pipeline uses `LLMExtractor` only when `OPENAI_API_KEY` is present; otherwise it uses the deterministic heuristic extractor. Explicit `EXTRACTOR_MODE=llm` requires `OPENAI_API_KEY`. LLM requests use the Responses API with structured outputs and `store: false`.
+
 ## Commands
 
 ```bash
@@ -174,13 +186,15 @@ See `docs/skill-reference.md` for how this repository references the skill. Use 
 
 ## Extractors
 
-The MVP includes:
+The extraction layer includes:
 
 - `HeuristicExtractor`: deterministic fallback that uses repo metadata, tree paths, README, selected files, docs/tests/examples signals, concrete reference files, and evidence tables.
-- `PatternExtractor` interface: future LLM extractors can implement this without changing the daily pipeline.
-- `src/extraction/prompts/pattern_extraction.md`: prompt contract for future LLM extraction.
+- `LLMExtractor`: evidence-first OpenAI Responses API extractor for semantic pattern judgment.
+- LLM reviewer pass: accepts or rejects LLM drafts before deterministic harness validation.
+- `PatternExtractor` interface plus `createExtractor()` factory: keeps daily orchestration independent from the extractor choice.
+- `src/extraction/prompts/pattern_extraction.md` and `src/extraction/prompts/pattern_review.md`: prompt contracts.
 
-No API key is hardcoded. A future `LLMExtractor` should be gated by environment variables such as `OPENAI_API_KEY`.
+No API key is hardcoded. Repo discovery, scoring, commit-pinned ingestion, source snapshots, harness validation, indexing, archive writes, and dashboard reads remain deterministic.
 
 ## Current Limits
 
@@ -188,7 +202,7 @@ No API key is hardcoded. A future `LLMExtractor` should be gated by environment 
 - No cloud deployment or multi-user workflow.
 - No deep local repo clone analysis.
 - Recent heat approximates activity through push/update/release/issue signals, not star velocity.
-- The heuristic extractor is conservative and may produce fewer patterns when evidence is weak.
+- LLM extraction quality still depends on selected source evidence; weak evidence should produce fewer accepted patterns, not more confident prose.
 - GitHub unauthenticated runs can hit rate limits; fixture fallback keeps the local loop testable.
 
 ## Extension Points
@@ -199,5 +213,5 @@ No API key is hardcoded. A future `LLMExtractor` should be gated by environment 
 - stricter harness scoring
 - issue/PR deep analysis
 - repo clone parser
-- stronger LLM extraction
+- LLM-assisted merge/dedupe and historical pattern review
 - periodic knowledge-base refactoring

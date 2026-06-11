@@ -6,7 +6,7 @@
 - `src/github/`: REST API wrapper with optional `GITHUB_TOKEN`.
 - `src/ingestion/`: bounded repo context collection and source snapshot writing.
 - `src/scoring/`: weighted candidate scoring.
-- `src/extraction/`: extractor interface plus deterministic heuristic extractor.
+- `src/extraction/`: extractor interface, factory, deterministic heuristic fallback, LLM extractor, reviewer prompts, and evidence-pack construction.
 - `src/knowledge/`: Markdown/frontmatter utilities, scaffolding, pattern writes.
 - `src/harness/`: schema, taxonomy, content quality, traceability checks.
 - `src/indexes/`: generated JSON retrieval indexes.
@@ -21,15 +21,29 @@ flowchart LR
   A["GitHub discovery"] --> B["Scoring"]
   B --> C["Repo ingestion"]
   C --> D["Source snapshot"]
-  C --> E["Pattern extraction"]
-  E --> F["Harness"]
-  F -->|accepted| G["knowledge/patterns"]
-  F -->|rejected| H["knowledge/rejected"]
-  G --> I["Index generator"]
-  G --> J["Daily card"]
-  I --> K["Local dashboard"]
-  J --> K
+  C --> E["Evidence pack"]
+  E --> F["Pattern extraction"]
+  F --> G["LLM review when enabled"]
+  G --> H["Harness"]
+  H -->|accepted| I["knowledge/patterns"]
+  H -->|rejected| J["knowledge/rejected"]
+  I --> K["Index generator"]
+  I --> L["Daily card"]
+  K --> M["Local dashboard"]
+  L --> M
 ```
+
+## LLM Boundary
+
+LLM usage is intentionally narrow. It only participates in `Pattern Extraction` and `Pattern Review`; discovery, scoring, commit-pinned ingestion, source snapshot writing, harness validation, indexing, learned-repo archive writes, and dashboard reads remain deterministic.
+
+`createExtractor()` chooses the extraction path:
+
+- `EXTRACTOR_MODE=heuristic`: always use deterministic heuristic extraction.
+- `EXTRACTOR_MODE=llm`: require `OPENAI_API_KEY` and use LLM extraction with heuristic fallback on extraction failure.
+- `EXTRACTOR_MODE=auto`: use LLM only when `OPENAI_API_KEY` is present.
+
+The LLM receives a bounded evidence pack, not unbounded repository access. The host normalizes repo, URL, commit, and reference files back to the commit-pinned source snapshot before harness validation.
 
 ## MVP Decision
 
