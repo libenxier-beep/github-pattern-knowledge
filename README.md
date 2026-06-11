@@ -61,6 +61,8 @@ Every body must include:
 
 The evidence path is deliberately stricter than a normal summary. `Evidence Table` must list each reference file, the observed structure in that file, concrete functions/classes/tests/modules/config keys, and why that evidence supports the pattern. `Source Evidence` must name the repo and concrete commit so an agent can reopen the stored snapshot before applying the pattern.
 
+Source snapshots are commit-pinned. After ingestion resolves the default-branch commit SHA, tree, README, and selected file contents are fetched with that commit SHA as the ref rather than with the moving branch name.
+
 ## Taxonomy
 
 The first taxonomy lives in `knowledge/schemas/taxonomy.json` and covers:

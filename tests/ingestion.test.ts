@@ -3,6 +3,8 @@ import { GitHubClient, type GitHubSearchRepo, type GitHubTreeItem } from "../src
 import { ingestRepo } from "../src/ingestion/ingestRepo";
 
 class FakeGitHubClient extends GitHubClient {
+  refs: Array<{ method: string; ref?: string }> = [];
+
   async getReleaseCount(): Promise<number> {
     return 2;
   }
@@ -11,7 +13,8 @@ class FakeGitHubClient extends GitHubClient {
     return "fedcba9876543210fedcba9876543210fedcba98";
   }
 
-  async getTree(): Promise<GitHubTreeItem[]> {
+  async getTree(_fullName: string, ref: string): Promise<GitHubTreeItem[]> {
+    this.refs.push({ method: "getTree", ref });
     return [
       { path: "src/plugins/registry.ts", type: "blob", size: 2000, sha: "tree-a" },
       { path: "tests/plugins/registry.test.ts", type: "blob", size: 2000, sha: "tree-b" },
@@ -19,11 +22,13 @@ class FakeGitHubClient extends GitHubClient {
     ];
   }
 
-  async getReadme(): Promise<string> {
+  async getReadme(_fullName: string, ref?: string): Promise<string> {
+    this.refs.push({ method: "getReadme", ref });
     return "A plugin registry project.";
   }
 
-  async getFileText(_fullName: string, _branch: string, filePath: string): Promise<string> {
+  async getFileText(_fullName: string, ref: string, filePath: string): Promise<string> {
+    this.refs.push({ method: "getFileText", ref });
     if (filePath.endsWith("registry.test.ts")) {
       return "test('rejects duplicate capability', () => registry.register(capability));";
     }
@@ -53,8 +58,17 @@ describe("repository ingestion", () => {
       default_branch: "main"
     };
 
-    const context = await ingestRepo(new FakeGitHubClient(), repo, "run-ingest", new Date("2026-06-11T00:00:00.000Z"), ["plugin"]);
+    const client = new FakeGitHubClient();
+    const context = await ingestRepo(client, repo, "run-ingest", new Date("2026-06-11T00:00:00.000Z"), ["plugin"]);
 
     expect(context.commit_sha).toBe("fedcba9876543210fedcba9876543210fedcba98");
+    expect(client.refs).toEqual(
+      expect.arrayContaining([
+        { method: "getTree", ref: "fedcba9876543210fedcba9876543210fedcba98" },
+        { method: "getReadme", ref: "fedcba9876543210fedcba9876543210fedcba98" },
+        { method: "getFileText", ref: "fedcba9876543210fedcba9876543210fedcba98" }
+      ])
+    );
+    expect(client.refs.some((entry) => entry.ref === "main")).toBe(false);
   });
 });

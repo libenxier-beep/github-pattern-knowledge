@@ -69,9 +69,9 @@ export class GitHubClient {
     return this.request<GitHubSearchRepo>(`/repos/${fullName}`);
   }
 
-  async getTree(fullName: string, branch: string): Promise<GitHubTreeItem[]> {
+  async getTree(fullName: string, ref: string): Promise<GitHubTreeItem[]> {
     const data = await this.request<{ tree: GitHubTreeItem[]; truncated: boolean }>(
-      `/repos/${fullName}/git/trees/${encodeURIComponent(branch)}?recursive=1`
+      `/repos/${fullName}/git/trees/${encodeURIComponent(ref)}?recursive=1`
     );
     return data.tree;
   }
@@ -81,18 +81,19 @@ export class GitHubClient {
     return data.sha;
   }
 
-  async getReadme(fullName: string): Promise<string> {
+  async getReadme(fullName: string, ref?: string): Promise<string> {
     try {
-      const data = await this.request<{ content: string; encoding: string }>(`/repos/${fullName}/readme`);
+      const refQuery = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+      const data = await this.request<{ content: string; encoding: string }>(`/repos/${fullName}/readme${refQuery}`);
       return Buffer.from(data.content, "base64").toString("utf8");
     } catch {
       return "";
     }
   }
 
-  async getFileText(fullName: string, branch: string, filePath: string): Promise<string> {
+  async getFileText(fullName: string, ref: string, filePath: string): Promise<string> {
     const encoded = filePath.split("/").map(encodeURIComponent).join("/");
-    const data = await this.request<{ content: string; encoding: string }>(`/repos/${fullName}/contents/${encoded}?ref=${encodeURIComponent(branch)}`);
+    const data = await this.request<{ content: string; encoding: string }>(`/repos/${fullName}/contents/${encoded}?ref=${encodeURIComponent(ref)}`);
     return Buffer.from(data.content, "base64").toString("utf8");
   }
 

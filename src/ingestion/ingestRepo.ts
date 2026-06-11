@@ -69,8 +69,8 @@ export async function ingestRepo(client: GitHubClient, repo: GitHubSearchRepo, r
   const releasesCount = await client.getReleaseCount(repo.full_name);
   const metadata = toRepoMetadata(repo, releasesCount);
   const commitSha = await client.getCommitSha(repo.full_name, repo.default_branch);
-  const tree = await client.getTree(repo.full_name, repo.default_branch);
-  const readme = await client.getReadme(repo.full_name);
+  const tree = await client.getTree(repo.full_name, commitSha);
+  const readme = await client.getReadme(repo.full_name, commitSha);
   const selected = selectTreeFiles(tree, seedFocus);
   const selectedFiles: SelectedFile[] = [];
   let contextChars = readme.length;
@@ -82,7 +82,7 @@ export async function ingestRepo(client: GitHubClient, repo: GitHubSearchRepo, r
       continue;
     }
     try {
-      const content = await client.getFileText(repo.full_name, repo.default_branch, item.path);
+      const content = await client.getFileText(repo.full_name, commitSha, item.path);
       const remaining = Math.max(0, MAX_CONTEXT_CHARS - contextChars);
       const { text, truncated } = truncateText(content, Math.min(MAX_FILE_CHARS, remaining));
       selectedFiles.push({ path: item.path, reason: item.reason, content: text, truncated, size: item.size });
