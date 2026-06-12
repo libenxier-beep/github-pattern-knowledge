@@ -1,5 +1,9 @@
 # GitHub Pattern Knowledge
 
+[![CI](https://github.com/libenxier-beep/github-pattern-knowledge/actions/workflows/ci.yml/badge.svg)](https://github.com/libenxier-beep/github-pattern-knowledge/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node.js >=22.12](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen.svg)](package.json)
+
 A local daily learning loop for agents: discover one high-quality open source repository, extract transferable engineering patterns, and save them as traceable Markdown knowledge.
 
 The project is built for Codex and other programming agents that need reusable engineering judgment, not another trending-repo feed. The main output is a file-backed knowledge base under `knowledge/patterns/`; the dashboard and daily cards are secondary reading surfaces.
@@ -66,6 +70,7 @@ LLM usage is intentionally narrow. Discovery, scoring, ingestion, source snapsho
 git clone https://github.com/libenxier-beep/github-pattern-knowledge.git
 cd github-pattern-knowledge
 npm install
+cp .env.example .env.local
 npm run daily -- --fixture
 npm run dev
 ```
@@ -215,6 +220,18 @@ EXTRACTOR_MODE=heuristic npm run daily -- --fixture
 
 Run `npm run evidence` when legacy notes, source traceability, commits, or evidence tables change.
 
+## Contributing
+
+Contributions are welcome. Start with `CONTRIBUTING.md`, and please keep changes focused, evidence-backed, and locally verifiable.
+
+Useful project files:
+
+- `CONTRIBUTING.md` for development and pull request expectations.
+- `SECURITY.md` for vulnerability reporting.
+- `CODE_OF_CONDUCT.md` for participation standards.
+- `.env.example` for local configuration.
+- `.github/workflows/ci.yml` for the CI contract.
+
 ## Local Dashboard
 
 ```bash
@@ -257,4 +274,4 @@ The first principle is auditability. Every accepted pattern should be traceable 
 
 ## License
 
-No license has been specified yet.
+MIT. See `LICENSE`.

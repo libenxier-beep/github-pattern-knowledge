@@ -4,6 +4,27 @@
   "private": true,
   "type": "module",
   "description": "Markdown-first GitHub engineering pattern knowledge base for Codex and programming agents.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/libenxier-beep/github-pattern-knowledge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/libenxier-beep/github-pattern-knowledge/issues"
+  },
+  "homepage": "https://github.com/libenxier-beep/github-pattern-knowledge#readme",
+  "keywords": [
+    "agents",
+    "codex",
+    "github",
+    "knowledge-base",
+    "software-architecture",
+    "engineering-patterns"
+  ],
+  "engines": {
+    "node": ">=22.12",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "vite",
     "daily": "tsx src/cli/daily.ts",
