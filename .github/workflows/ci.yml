@@ -13,9 +13,6 @@ jobs:
   test:
     name: Test and build
     runs-on: ubuntu-latest
-    env:
-      KNOWLEDGE_ROOT: /tmp/github-pattern-knowledge-ci
-      EXTRACTOR_MODE: heuristic
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,7 +36,12 @@ jobs:
         run: npm run build
 
       - name: Run deterministic daily smoke test
+        env:
+          KNOWLEDGE_ROOT: /tmp/github-pattern-knowledge-ci
+          EXTRACTOR_MODE: heuristic
         run: npm run daily -- --fixture
 
       - name: Validate generated knowledge
+        env:
+          KNOWLEDGE_ROOT: /tmp/github-pattern-knowledge-ci
         run: npm run harness
