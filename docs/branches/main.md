@@ -11,7 +11,7 @@ last_reviewed: 2026-07-13
 
 ## Purpose
 
-Provide the stable application line for the GitHub engineering-pattern ingestion, validation, finalization, and local dashboard system.
+Provide the stable application line for the GitHub engineering-pattern ingestion, validation, learned-repository registry, and local dashboard system.
 
 ## Allowed Scope
 
@@ -19,7 +19,7 @@ Tracked application source, tests, configuration, maintained documentation, depe
 
 ## Prohibited Scope
 
-Credentials, ignored vendor clones, dependency or build output, generated Work Context artifacts, unrelated private knowledge, and bypasses around commit pinning or the finalization value gate.
+Credentials, ignored vendor clones, dependency or build output, generated Work Context artifacts, unrelated private knowledge, and bypasses around commit pinning, harness validation, or the successful-run learned-registry guard.
 
 ## Relationships
 
@@ -27,8 +27,8 @@ This is the default stable line. The application writes governed knowledge to re
 
 ## Acceptance
 
-Relevant tests, type checking, production build, and pattern harness pass; fixture smoke coverage remains deterministic; accepted patterns remain traceable to pinned evidence; only finalization can update learned state.
+Relevant tests, type checking, production build, and pattern harness pass; fixture smoke coverage remains deterministic; accepted patterns remain traceable to pinned evidence; failed and fixture runs do not mark repositories learned.
 
 ## Exit
 
-This branch is long-lived. Supersede it only through an explicit default-branch migration that updates scheduled operation, the operating skill, knowledge-target configuration, and all active branch contracts.
+This branch is long-lived. Supersede it only through an explicit default-branch migration that updates scheduled operation, the operating skill, knowledge-target configuration, learned-registry behavior, and all active branch contracts.
