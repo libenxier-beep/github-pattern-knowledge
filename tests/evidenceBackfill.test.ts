@@ -148,6 +148,8 @@ describe("evidence backfill", () => {
     expect(updated).toContain("commit: \"2222222222222222222222222222222222222222\"");
     expect(updated).toContain("## Evidence Table");
     expect(updated).toContain("tests/plugins/registry.test.ts");
+    expect(updated).toContain("maturity: experimental");
+    expect(updated).toContain("risk_level: medium");
     expect(harness.valid).toBe(true);
   });
 });

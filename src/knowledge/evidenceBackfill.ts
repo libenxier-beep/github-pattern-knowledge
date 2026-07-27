@@ -237,6 +237,8 @@ export async function backfillPatternEvidence(projectRoot = process.cwd(), optio
         ...parsed.frontmatter.source_repos.slice(1)
       ],
       evidence_strength: parsed.frontmatter.evidence_strength === "strong" ? "strong" : "medium",
+      maturity: parsed.frontmatter.maturity ?? "experimental",
+      risk_level: parsed.frontmatter.risk_level ?? parsed.frontmatter.complexity,
       updated_at: new Date().toISOString().slice(0, 10)
     };
     const withTable = replaceSection(parsed.body, "Evidence Table", evidenceTable(rows), "Source Evidence");
