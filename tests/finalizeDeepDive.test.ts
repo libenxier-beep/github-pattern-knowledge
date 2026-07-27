@@ -115,7 +115,18 @@ The mechanism is bound to owner/repo at commit ${commit}; src/runtime.py and tes
 
 async function fixture(
   qualified = true,
-  reportContent = `# 日报
+  reportContent = `---
+date: 2026-07-26
+source_repo: owner/repo
+source_url: https://github.com/owner/repo
+patterns:
+  - pattern-loop
+card_type: daily_design_card
+run_id: run-finalize
+created_at: 2026-07-26
+---
+
+# 日报
 
 ## 项目本身做什么
 
@@ -432,6 +443,33 @@ describe("deep-dive finalizer", () => {
 
     await expect(finalizeDeepDive({ projectRoot, manifestPath })).rejects.toThrow(
       "report_main_narrative_contains_internal_identifiers"
+    );
+    expect((await readLearnedRepoRegistry(projectRoot)).learned_count).toBe(0);
+  });
+
+  test("rejects a readable report that cannot be published as an active card", async () => {
+    const report = `# 日报
+
+## 项目本身做什么
+
+这个项目把隐含关系提升为可验证的运行时结构，并保留完整的问题、机制、收益、边界和迁移说明。
+
+它解决的不是单一功能缺失，而是多个参与者和多阶段处理下，责任、状态、顺序与失败恢复逐渐变得不可追踪的问题。设计先明确输入和判断规则，再把结果交给确定性检查，而不是依赖模糊的事后解释。
+
+## 核心机制如何工作
+
+系统从输入开始，根据明确契约推进状态，产生结果并运行确定性验证；失败时保留证据并停止发布。
+
+一个具体例子是：收到候选对象后，宿主先确认身份和允许的关系，再按边界执行变换；如果验证通过才发布，否则保留原始材料和失败原因。这样既允许智能模块提出候选，也不把最终事实权交给不可重复的判断。
+
+## 证据附录
+
+固定提交中的生产代码和失败测试提供证据。
+`;
+    const { projectRoot, manifestPath } = await fixture(true, report);
+
+    await expect(finalizeDeepDive({ projectRoot, manifestPath })).rejects.toThrow(
+      "Deep-dive active card gate failed"
     );
     expect((await readLearnedRepoRegistry(projectRoot)).learned_count).toBe(0);
   });

@@ -15,7 +15,7 @@ import {
 } from "../deepDive/valueFunction";
 import { markRepoLearned, readLearnedRepoRegistry } from "../knowledge/repoRegistry";
 import { loadTaxonomy } from "../knowledge/taxonomy";
-import { validatePatternMarkdown } from "../harness/patternHarness";
+import { validateCardMarkdown, validatePatternMarkdown } from "../harness/patternHarness";
 import type { LocalRepoReceipt } from "../deepDive/localRepo";
 import { acquireDailyFileLock } from "./daily";
 
@@ -625,9 +625,14 @@ async function finalizeDeepDiveUnlocked(options: FinalizeDeepDiveOptions): Promi
   await requireIndependentReaderReview(manifest, workContextsRoot);
 
   const reportPath = resolveArtifact(workContextsRoot, manifest.report_file);
-  const reportReadability = assessHumanReportReadability(await readFile(reportPath, "utf8"));
+  const reportMarkdown = await readFile(reportPath, "utf8");
+  const reportReadability = assessHumanReportReadability(reportMarkdown);
   if (!reportReadability.valid) {
     throw new Error(`Deep-dive report gate failed: ${reportReadability.errors.join(", ")}`);
+  }
+  const activeCardGate = validateCardMarkdown(path.basename(reportPath), reportMarkdown);
+  if (!activeCardGate.valid) {
+    throw new Error(`Deep-dive active card gate failed: ${activeCardGate.errors.join(", ")}`);
   }
 
   const learnedFiles = manifest.units
