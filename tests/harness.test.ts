@@ -25,6 +25,9 @@ pattern_types:
   - plugin_system
   - lifecycle_hooks
 complexity: medium
+evidence_strength: strong
+maturity: stable
+risk_level: medium
 quality_score: 87
 source_repos:
   - repo: owner/project
@@ -115,6 +118,15 @@ describe("pattern harness", () => {
 
     expect(result.valid).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+
+  test("rejects a generated pattern without Work Context quality classifications", () => {
+    const invalid = validPattern.replace("evidence_strength: strong\n", "");
+
+    const result = validatePatternMarkdown("pattern-plugin-registry-lifecycle-hooks.md", invalid, taxonomy);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("evidence_strength is required");
   });
 
   test("rejects generic pattern notes without source evidence", () => {

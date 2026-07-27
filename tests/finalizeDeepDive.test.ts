@@ -23,6 +23,9 @@ project_types:
 pattern_types:
   - state_machine
 complexity: high
+evidence_strength: strong
+maturity: stable
+risk_level: medium
 quality_score: 94
 source_repos:
   - repo: owner/repo
