@@ -1,6 +1,7 @@
 # Verification Checklist
 
 - run `npm run automation-preflight` from the clean commit that the automation will execute
+- confirm the repository-owned independent-review schema passes its focused API-compatibility test
 
 - `npm test`
 - `npm run typecheck`

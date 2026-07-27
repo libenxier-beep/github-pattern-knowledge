@@ -13,6 +13,7 @@ const requiredFiles = [
   "docs/daily-workflow.md",
   "docs/human-report-quality-standard.md",
   "docs/verification-checklist.md",
+  "schemas/independent-source-judgment.schema.json",
   "src/cli/automationPreflight.ts",
   "src/cli/daily.ts",
   "src/cli/finalize.ts",

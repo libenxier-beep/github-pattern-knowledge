@@ -10,6 +10,7 @@ This document is the canonical operating rule for one real GitHub Pattern Knowle
 | Run order, handoffs, and stop behavior | this document |
 | Candidate lanes, exclusions, and deterministic ranking | `src/discovery/selectionPolicy.ts`, `src/discovery/discoverRepos.ts`, and `src/scoring/scoreRepo.ts` |
 | Human-report reasoning and readability | `docs/human-report-quality-standard.md` |
+| Independent source-judgment response contract | `schemas/independent-source-judgment.schema.json` |
 | Manifest shape and value gates | `src/deepDive/valueFunction.ts` |
 | Report mechanical gates | `src/deepDive/reportReadability.ts` |
 | Publication, provenance, and registry mutation | `src/scheduler/finalizeDeepDive.ts` |
@@ -65,6 +66,8 @@ Use `docs/human-report-quality-standard.md` as the positive reasoning contract. 
 - Deterministic code validates provenance, schema, value score, report shape, ownership, publication safety, and registry mutation.
 
 Reviewer or model failure is a run failure. Do not silently replace either with keyword or heuristic approval.
+
+Use the repository-owned `schemas/independent-source-judgment.schema.json` for the source-judgment response. Do not generate an ad hoc response schema inside a run. Bind the returned run id and commit to the active preparation receipt before accepting any verdict.
 
 ### 6. Build the audit trail
 

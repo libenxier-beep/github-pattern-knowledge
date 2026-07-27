@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reviewer_role",
+    "reviewed_run_id",
+    "reviewed_commit",
+    "verdict",
+    "reviewer_provenance",
+    "candidate_reviews",
+    "accepted_ids",
+    "rejected_ids",
+    "blocking_issues",
+    "overall_rationale"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "reviewer_role": {
+      "type": "string",
+      "const": "independent_source_judge"
+    },
+    "reviewed_run_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "reviewed_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "fail"]
+    },
+    "reviewer_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "model_reported", "method", "heuristic_fallback_used"],
+      "properties": {
+        "runtime": {
+          "type": "string",
+          "minLength": 3
+        },
+        "model_reported": {
+          "type": "string",
+          "minLength": 3
+        },
+        "method": {
+          "type": "string",
+          "minLength": 20
+        },
+        "heuristic_fallback_used": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "candidate_reviews": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "disposition",
+          "problem",
+          "design_choice",
+          "mechanism",
+          "importance",
+          "non_obviousness",
+          "benefits_tradeoffs_boundaries",
+          "source_vs_inference",
+          "evidence_refs",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 3
+          },
+          "disposition": {
+            "type": "string",
+            "enum": ["accepted", "rejected", "revise"]
+          },
+          "problem": {
+            "type": "string",
+            "minLength": 40
+          },
+          "design_choice": {
+            "type": "string",
+            "minLength": 40
+          },
+          "mechanism": {
+            "type": "string",
+            "minLength": 60
+          },
+          "importance": {
+            "type": "string",
+            "minLength": 40
+          },
+          "non_obviousness": {
+            "type": "string",
+            "minLength": 40
+          },
+          "benefits_tradeoffs_boundaries": {
+            "type": "string",
+            "minLength": 60
+          },
+          "source_vs_inference": {
+            "type": "string",
+            "minLength": 40
+          },
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 60
+          }
+        }
+      }
+    },
+    "accepted_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "rejected_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "blocking_issues": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "overall_rationale": {
+      "type": "string",
+      "minLength": 80
+    }
+  }
+}
