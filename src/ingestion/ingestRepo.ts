@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { GitHubClient, type GitHubSearchRepo, toRepoMetadata } from "../github/client";
 import type { RepoContext, SelectedFile } from "../types";
 import { ensureDir, truncateText, writeJson } from "../utils/fs";
-import { getKnowledgePaths, safeKebab, toProjectRelative } from "../utils/paths";
+import { getKnowledgePaths, safeKebab, toKnowledgeRelative } from "../utils/paths";
 
 const MAX_FILE_CHARS = 20_000;
 const MAX_SELECTED_FILES = 12;
@@ -158,5 +158,5 @@ export async function writeSourceSnapshot(projectRoot: string, context: RepoCont
     fetched_at: context.fetched_at,
     truncation: context.truncation
   });
-  return toProjectRelative(projectRoot, snapshotPath);
+  return toKnowledgeRelative(projectRoot, snapshotPath, paths.knowledgeRoot);
 }

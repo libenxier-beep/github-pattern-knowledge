@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_SEED_REPOS } from "../src/seeds/defaultSeedRepos";
 import { ensureSeedManifest, getPendingSeeds } from "../src/seeds/seedPool";
-import { markRepoLearned } from "../src/knowledge/repoRegistry";
+import { markRepoLearned, readLearnedRepoRegistry } from "../src/knowledge/repoRegistry";
 import { getKnowledgePaths } from "../src/utils/paths";
 
 describe("seed repository pool", () => {
@@ -47,6 +47,26 @@ describe("seed repository pool", () => {
     expect(pending).toHaveLength(59);
     expect(pending[0].repo).toBe("pytest-dev/pytest");
     expect(pending.some((seed) => seed.repo === "git/git")).toBe(false);
+  });
+
+  test("pending seed lookup reopens legacy-only repos for a proper deep dive", async () => {
+    const projectRoot = await mkdtemp(path.join(tmpdir(), "seed-registry-legacy-"));
+    await markRepoLearned(projectRoot, {
+      repo: "git/git",
+      url: "https://github.com/git/git",
+      learned_at: "2026-06-11T00:00:00.000Z",
+      run_id: "seed-legacy",
+      pattern_files: ["github_engineering_patterns/sources/runs/legacy/review_queue/git.md"]
+    });
+    const registryPath = path.join(getKnowledgePaths(projectRoot).knowledgeRoot, "registry", "learned_repos.json");
+    const registry = JSON.parse(await readFile(registryPath, "utf8"));
+    registry.repos[0].status = "legacy_unreviewed";
+    await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+    const pending = await getPendingSeeds(projectRoot);
+
+    expect(pending.some((seed) => seed.repo === "git/git")).toBe(true);
+    expect((await readLearnedRepoRegistry(projectRoot)).learned_count).toBe(0);
   });
 
   test("ensureSeedManifest preserves user-edited seed repos and only appends missing defaults", async () => {

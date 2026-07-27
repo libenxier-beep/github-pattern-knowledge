@@ -4,206 +4,168 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js >=22.12](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen.svg)](package.json)
 
-A local daily learning loop for agents: discover one high-quality open source repository, extract transferable engineering patterns, and save them as traceable Markdown knowledge.
+A local, file-backed system for turning commit-pinned GitHub evidence into reusable engineering knowledge.
 
-The project is built for Codex and other programming agents that need reusable engineering judgment, not another trending-repo feed. The main output is a file-backed knowledge base under `knowledge/patterns/`; the dashboard and daily cards are secondary reading surfaces.
+The pipeline has two deliberately separate phases:
 
-## What It Does
+1. `daily` selects one repository and records a bounded source snapshot. It cannot publish patterns, cards, indexes, routed notes, or learned-registry state.
+2. `finalize` verifies a real pinned checkout, source files, artifact provenance, transfer contract, report, ownership, and source commit before it can publish success metadata and mark the repository accepted.
 
-- Finds or ingests GitHub repositories worth studying.
-- Scores candidates by engineering quality, long-term impact, and recent activity.
-- Fetches README, metadata, tree summaries, and selected source files at a concrete commit.
-- Extracts 1-3 engineering pattern drafts from bounded evidence.
-- Validates every draft with a deterministic harness before accepting it.
-- Writes accepted patterns as Markdown notes with YAML frontmatter.
-- Regenerates JSON indexes for agent retrieval.
-- Produces a local dashboard and human-facing daily card.
+This separation keeps discovery cheap and reversible while making durable knowledge expensive to claim.
 
-## Why This Exists
+## Core Invariants
 
-Most agents can summarize a repository once. This project tries to make the useful part durable.
+- A title, filename, heuristic template, or self-reported score/checkout flag is never evidence of a reusable loop.
+- Daily preparation writes only source evidence and a failed/preparation receipt. The `failed` status is retained for compatibility until a deep finalization succeeds.
+- Finalization requires an existing source run plus a durable checkout receipt whose repository, Git origin, Git HEAD, fixture flag, and commit match the manifest.
+- Accepted units need production evidence, corroboration, unique ids and artifacts, correct Work Context ownership, bounded scores, and complete cross-domain transfer bridges.
+- Accepted artifact frontmatter must bind the same repository and commit and list evidence files that exist in the pinned checkout.
+- Locators are canonical, authority-scoped relative paths; aliases, traversal, arbitrary absolute paths, and wrong-root fallbacks fail closed.
+- Finalization is serialized with preparation, rejects conflicting replay for one run id, and rolls back receipt/run mutations when the learned-registry commit fails.
+- Only `accepted` registry records suppress future ingestion. `legacy_unreviewed` and `quarantined` records remain eligible.
+- Concurrent daily runs and concurrent registry writers are guarded by owner-aware cross-process locks. Registry publication uses atomic replacement.
+- Historical run locators are part of the harness contract; archive or quarantine moves must retain a resolvable migration receipt.
 
-Instead of saving vague takeaways like "this repo has good architecture", it stores pattern notes that include:
-
-- the engineering problem the pattern solves
-- when to use or avoid it
-- boundary decisions and tradeoffs
-- failure modes and simpler alternatives
-- concrete source evidence from commit-pinned files
-- retrieval tags for later agent use
-
-The goal is a growing local library of engineering patterns that an agent can reopen, audit, and apply in future software work.
-
-## How It Works
+## Flow
 
 ```mermaid
 flowchart LR
-  A["GitHub discovery or seed repo"] --> B["Scoring"]
-  B --> C["Commit-pinned ingestion"]
-  C --> D["Source snapshot"]
-  C --> E["Evidence pack"]
-  E --> F["Pattern extraction"]
-  F --> G["Optional LLM review"]
-  G --> H["Deterministic harness"]
-  H -->|accepted| I["knowledge/patterns"]
-  H -->|rejected| J["knowledge/rejected"]
-  I --> K["Generated indexes"]
-  I --> L["Daily card"]
-  K --> M["Local dashboard"]
-  L --> M
+  A["Seed or GitHub discovery"] --> B["Score and select one repo"]
+  B --> C["Resolve commit"]
+  C --> D["Write source snapshot"]
+  D --> E["Preparation receipt"]
+  E --> F["Pinned checkout and durable receipt"]
+  F --> G["Agent deep dive, audit trail, and value manifest"]
+  G --> H["Deterministic finalization gates"]
+  H -->|pass| I["Success receipt and accepted registry"]
+  H -->|fail| J["No learned-registry mutation"]
+  I --> K["Patterns, indexes, cards, dashboard"]
 ```
 
-LLM usage is intentionally narrow. Discovery, scoring, ingestion, source snapshotting, validation, indexing, learned-repo registry writes, and dashboard reads are deterministic. LLMs may only help with pattern extraction and review, and only from a bounded evidence pack.
-
-## Tech Stack
-
-- TypeScript and Node.js for the CLI, ingestion, scoring, validation, and file-backed pipeline.
-- Vite and React for the local dashboard.
-- GitHub REST API through `fetch`, with optional `GITHUB_TOKEN`.
-- Markdown plus YAML frontmatter for durable notes.
-- Generated JSON indexes for retrieval.
-- Vitest for behavior tests.
-
 ## Quick Start
+
+Requirements: Node.js 22.12+ and npm 10+.
 
 ```bash
 git clone https://github.com/libenxier-beep/github-pattern-knowledge.git
 cd github-pattern-knowledge
 npm install
-cp .env.example .env.local
 npm run daily -- --fixture
-npm run dev
+npm test
+npm run harness
 ```
 
-Open the Vite URL shown in the terminal to view the local dashboard.
+The fixture command is a preparation smoke test. It intentionally produces no accepted pattern or learned repository.
 
-The deterministic fixture run is the easiest first smoke test. For real GitHub discovery, run:
-
-```bash
-npm run daily
-```
-
-## Configuration
-
-The tool can run without secrets, but unauthenticated GitHub API limits are lower.
+For GitHub discovery, optionally provide a token and run:
 
 ```bash
 export GITHUB_TOKEN=your_github_token_here
+npm run daily
 ```
 
-Optional LLM extraction:
-
-```bash
-export OPENAI_API_KEY=your_openai_api_key_here
-export EXTRACTOR_MODE=auto        # auto | heuristic | llm
-export OPENAI_MODEL=gpt-5.5
-export OPENAI_REASONING_EFFORT=medium
-export LLM_REVIEW=1
-```
-
-`EXTRACTOR_MODE=auto` uses the LLM extractor only when `OPENAI_API_KEY` is present. `EXTRACTOR_MODE=heuristic` always uses the deterministic extractor. `EXTRACTOR_MODE=llm` requires `OPENAI_API_KEY` and falls back safely if extraction fails.
-
-Keep secrets in the shell environment or `.env.local`. Do not commit `.env`, `.env.local`, tokens, `node_modules`, `dist`, or generated private knowledge data.
-
-## Knowledge Location
-
-When used as a local Codex system project, the default generated knowledge root is:
-
-```txt
-$HOME/.codex/memories/work_contexts/github_engineering_patterns/
-```
-
-You can override it:
-
-```bash
-export KNOWLEDGE_ROOT=/path/to/knowledge-root
-```
-
-Expected layout:
-
-```txt
-knowledge-root/
-  README.md           work-context entry and routing guidance
-  patterns/           accepted pattern notes
-  indexes/            generated retrieval indexes
-  cards/              daily human-facing cards
-  registry/           seed and learned-repo registries
-  rejected/           failed drafts plus failure metadata
-  sources/            commit-pinned source snapshots
-  schemas/            taxonomy and retrieval strategy
-  runs/               run metadata and failure records
-```
-
-`patterns/` is the source of truth. `indexes/` is generated cache.
+Keep secrets in the shell environment or `.env.local`. Do not commit tokens, local knowledge, `node_modules`, or `dist`.
 
 ## Commands
 
 ```bash
-npm run daily                 # full daily loop
-npm run daily -- --fixture    # deterministic smoke run
-npm run seed -- --list        # show pending seed repos
-npm run seed -- --limit 3     # process pending seed repos
-npm run evidence              # backfill or tighten evidence tables
-npm run index                 # regenerate retrieval indexes
-npm run harness               # validate accepted pattern notes
-npm run dev                   # start local dashboard
-npm run typecheck             # TypeScript check
-npm test                      # Vitest suite
-npm run build                 # production build
+npm run daily                 # select and snapshot one candidate
+npm run automation-preflight  # verify the scheduled-run contract is committed and clean
+npm run daily -- --fixture    # deterministic preparation smoke test
+npm run daily -- --skip-seeds # bypass pending seeds for discovery
+npm run seed -- --list        # list pending seed repositories
+npm run seed -- --limit 3     # prepare up to three pending seeds
+npm run finalize -- --manifest /absolute/path/value_manifest.json
+npm run index                 # regenerate active retrieval indexes
+npm run evidence              # maintain legacy evidence tables
+npm run harness               # validate active notes, cards, and run locators
+npm run dev                   # local dashboard
+npm test
+npm run typecheck
+npm run build
 ```
 
-## Daily Run
+## Phase 1: Preparation
 
-`npm run daily` performs the full loop:
+`npm run daily`:
 
-1. Load pending seed repos first, then fall back to open GitHub discovery.
-2. Skip repositories already recorded in `registry/learned_repos.json`.
-3. Score candidates with engineering quality, long-term impact, and recent activity.
-4. Select one repository.
-5. Resolve a concrete commit SHA.
-6. Fetch README, metadata, tree summary, and selected files at that commit.
-7. Write a source snapshot.
-8. Extract pattern drafts from the bounded evidence pack.
-9. Run deterministic validation.
-10. Write accepted notes and rejected drafts.
-11. Regenerate indexes.
-12. Generate a daily card.
-13. Write run metadata.
+1. Acquires the configured knowledge-root daily lock, so separate worktrees targeting the same knowledge base cannot overlap.
+2. Uses pending accepted-status-aware seeds first, then ordinary GitHub discovery.
+3. Scores candidates and selects one repository.
+4. Resolves a concrete commit and captures bounded repository evidence.
+5. Writes `sources/<run_id>/repo_snapshot.json` and a receipt under `runs/failed/`.
 
-Successful seed repos are added to the learned registry. Failed or rate-limited repos remain pending so they can be retried later.
+Preparation does not invoke a pattern extractor. It does not modify active patterns, other Work Contexts, cards, indexes, or the learned registry.
 
-## Pattern Note Standard
+## Phase 2: Deep Finalization
 
-Each accepted pattern note must include YAML frontmatter with:
+A capable agent or human performs the source-complete analysis and prepares:
 
-- `id`, `name`, `summary`
-- `engineering_problems`, `project_types`, `pattern_types`
-- `complexity`, `quality_score`
-- `source_repos[].repo`, `source_repos[].url`, `source_repos[].commit`
-- 2-4 `source_repos[].reference_files`
-- `use_when`, `avoid_when`, `tradeoffs`, `transfer_targets`
-- `created_at`, `updated_at`, `run_id`
+- a plain-language report
+- at least four distinct audit files
+- accepted and rejected unit records
+- a durable checkout receipt for the real Git repository at the pinned commit
+- a schema `1.5` `value_manifest.json` bound to the preparation run, repository, commit, checkout receipt, and required independent `reader_review_file`; it must identify every important, non-obvious core functional paradigm, explain its problem, design choice, source-observed mechanism, counterfactual importance, benefits, clever move, tradeoffs, evidence, and canonical accepted loop, and include at least one justified structural transfer (older `1.0` through `1.4` manifests remain historical evidence, not replayable publication input)
+- pattern or routed artifacts whose `source_repos` frontmatter names that repository, commit, and evidence files
 
-Each body must include:
+Then run:
 
-- `Engineering Problem`
-- `Core Judgment`
-- `Use When`
-- `Avoid When`
-- `Design Forces`
-- `Boundary Decisions`
-- `Failure Modes`
-- `Simpler Alternatives`
-- `Transfer Guidance`
-- `Implementation Hint`
-- `Evidence Table`
-- `Source Evidence`
+```bash
+npm run finalize -- --manifest /absolute/path/value_manifest.json
+```
 
-The evidence table is not decorative. It must name reference files, describe observed structures, list concrete functions/classes/tests/modules/config keys, and explain why each file supports the pattern.
+The deterministic gate rejects:
+
+- missing, fixture, wrong-run, wrong-repository, or wrong-commit source/checkout receipts
+- unverifiable Git origin/HEAD, a dirty checkout, evidence absent from the pinned Git tree or whose filtered working bytes differ from its commit blob, fewer than two distinct evidence files, or artifact evidence declarations that do not exactly match that set
+- unknown unit kinds, or duplicate/non-canonical unit, artifact, audit, report, or receipt locators
+- artifact ownership that does not match its Work Context path
+- no accepted canonical loop or no complete transfer bridge
+- a missing or malformed primary-value thesis; no important, non-obvious core functional paradigm; a paradigm without counterfactual importance, causal mechanism, benefits, clever move, tradeoffs, pinned evidence, or canonical alignment; or a missing/failed/malformed independent reader review receipt
+- a report whose presentation leaks source identifiers, lacks a separated evidence appendix, or is substantively empty; semantic quality is enforced through the paradigm manifest, pinned evidence, canonical loops, and independent-reader receipt rather than prescribed headings
+- missing production/corroborating evidence, duplicate references, or evidence files absent from the checkout
+- accepted pattern artifacts that fail the taxonomy, frontmatter, required-section, evidence-table, or filename/id harness
+- out-of-range scores, low dimensions, or total score below 85
+- missing artifacts, malformed historical locator shapes, or a report that leaks source identifiers into its main narrative
+
+The full transfer bridge captures the commodity baseline, production pressure, precise craft move, obvious alternative failure, one or more justified transfer destinations, invariants, non-transferable details, break conditions, a recall cue, a bounded adaptation task, and a deterministic acceptance check.
+
+See `docs/daily-workflow.md` for the canonical end-to-end runbook and `docs/human-report-quality-standard.md` for the positive report contract and paired false-success scenarios. Required headings and length floors are mechanical guards; the actual standard is that a reader can retell one concrete end-to-end case, explain the primary mechanism and evidence boundary, distinguish adjacent approaches, and state their composition sequence. Explanation sufficiency takes priority over a target character count.
+
+## Knowledge Location
+
+For the local Codex system project, the default knowledge root is:
+
+```text
+$HOME/.codex/memories/work_contexts/github_engineering_patterns/
+```
+
+Use isolated roots for tests or migrations:
+
+```bash
+export KNOWLEDGE_ROOT=/path/to/work_contexts/github_engineering_patterns
+export WORK_CONTEXTS_ROOT=/path/to/work_contexts # optional explicit override
+```
+
+If only `KNOWLEDGE_ROOT` is set, routed Work Context ownership derives from its parent directory so one run cannot split writes across unrelated roots.
+
+```text
+github_engineering_patterns/
+  patterns/           active accepted complete-loop notes
+  indexes/            generated retrieval projections
+  cards/              human-facing reports; not default Agent retrieval
+  registry/           seeds, status-aware provenance, migration receipts
+  rejected/           rejected evidence and recoverable quality quarantine
+  sources/            commit-pinned snapshots and audit trails
+  schemas/            taxonomy and retrieval policy
+  runs/               preparation, success, and finalization receipts
+```
+
+`patterns/` is the active knowledge authority. `indexes/` is generated. `cards/` is a human projection. `sources/`, `runs/`, and `rejected/` preserve evidence and recovery history.
 
 ## Validation
 
-Before treating generated knowledge as ready, run:
+Run all gates before claiming the knowledge base is ready:
 
 ```bash
 npm test
@@ -212,65 +174,21 @@ npm run build
 npm run harness
 ```
 
-For deterministic end-to-end smoke testing:
+The harness validates active pattern/card structure, accepted-registry ownership, card/source eligibility, related-pattern resolution, local-path portability, and authority-scoped locators in historical run JSON (including nested batch results). It refuses absolute, traversal, symlink-escape, and same-name/wrong-root matches. Work Context repository validation and lifecycle audits remain separate because they govern the wider memory tree.
 
-```bash
-EXTRACTOR_MODE=heuristic npm run daily -- --fixture
-```
-
-Run `npm run evidence` when legacy notes, source traceability, commits, or evidence tables change.
-
-## Contributing
-
-Contributions are welcome. Start with `CONTRIBUTING.md`, and please keep changes focused, evidence-backed, and locally verifiable.
-
-Useful project files:
-
-- `CONTRIBUTING.md` for development and pull request expectations.
-- `SECURITY.md` for vulnerability reporting.
-- `CODE_OF_CONDUCT.md` for participation standards.
-- `.env.example` for local configuration.
-- `.github/workflows/ci.yml` for the CI contract.
-
-## Local Dashboard
+## Dashboard
 
 ```bash
 npm run dev
 ```
 
-The dashboard reads local knowledge artifacts through a Vite-only local API and shows:
-
-- today's card
-- accepted pattern notes
-- retrieval index axes
-- run metadata
-- rejected entries and failure reasons
-- learned and pending repository archive summaries
-
-It is designed for local development and review, not as a hosted multi-user app.
+The local dashboard shows active cards and patterns, generated indexes, logical run state, failures, and repository status. Run records with the same `run_id` are merged with `success > failed > receipt/unknown` precedence so an incomplete finalization receipt cannot hide a failed run.
 
 ## Project Boundaries
 
-This repository intentionally avoids:
+This repository intentionally avoids cloud deployment assumptions, vector databases, graph databases, unbounded browsing, and automatic publication of private knowledge. Auditability and recoverability take priority over ingestion volume.
 
-- cloud deployment assumptions
-- vector databases
-- graph databases
-- deep local clone analysis
-- unbounded LLM browsing
-- automatic publication of private generated knowledge
-
-The first principle is auditability. Every accepted pattern should be traceable back to a concrete repository, commit, and small set of source files.
-
-## Roadmap
-
-- SQLite index cache.
-- Semantic retrieval.
-- Human feedback and pattern merge/dedupe.
-- Stricter harness scoring.
-- Deeper issue and pull request analysis.
-- Repo clone parser for richer source evidence.
-- Historical pattern review and refactoring.
+See `CONTRIBUTING.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md` for project participation and reporting guidance.
 
 ## License
 

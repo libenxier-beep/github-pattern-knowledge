@@ -9,7 +9,7 @@ type SeedManifest = {
   repos?: SeedRepo[];
 };
 
-export type ArchiveRepoStatus = "learned" | "pending";
+export type ArchiveRepoStatus = "learned" | "legacy_unreviewed" | "quarantined" | "pending";
 
 export type ArchiveRepoRow = {
   repo: string;
@@ -39,6 +39,16 @@ function normalizeRepo(repo: string): string {
   return repo.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/$/, "").toLowerCase();
 }
 
+function blocksReingestion(repo: LearnedRepoRecord): boolean {
+  return repo.status === undefined || repo.status === "accepted";
+}
+
+function archiveStatus(repo: LearnedRepoRecord): ArchiveRepoStatus {
+  if (repo.status === undefined || repo.status === "accepted") return "learned";
+  if (repo.status === "quarantined") return "quarantined";
+  return "legacy_unreviewed";
+}
+
 async function readJsonIfExists<T>(filePath: string, fallback: T): Promise<T> {
   if (!(await pathExists(filePath))) {
     return fallback;
@@ -50,7 +60,7 @@ function toLearnedRow(seed: SeedRepo | undefined, learned: LearnedRepoRecord): A
   return {
     repo: learned.repo,
     url: learned.url,
-    status: "learned",
+    status: archiveStatus(learned),
     rank: seed?.rank ?? null,
     priority: seed?.priority ?? null,
     focus: seed?.focus ?? [],
@@ -91,6 +101,7 @@ export async function buildArchiveSummary(projectRoot = process.cwd()): Promise<
   const seeds = [...(seedRegistry.repos ?? [])].sort((a, b) => a.rank - b.rank);
   const seedsByRepo = new Map(seeds.map((seed) => [normalizeRepo(seed.repo), seed]));
   const learnedByRepo = new Map(learnedRegistry.repos.map((repo) => [normalizeRepo(repo.repo), repo]));
+  const acceptedRepos = new Set(learnedRegistry.repos.filter(blocksReingestion).map((repo) => normalizeRepo(repo.repo)));
   const rows: ArchiveRepoRow[] = [];
 
   for (const seed of seeds) {
@@ -116,9 +127,9 @@ export async function buildArchiveSummary(projectRoot = process.cwd()): Promise<
     seed_registry_generated_at: seedRegistry.generated_at ?? null,
     learned_registry_generated_at: learnedRegistry.generated_at ?? null,
     seed_count: seedRegistry.seed_count ?? seeds.length,
-    learned_count: learnedRegistry.repos.length,
-    pending_count: seeds.filter((seed) => !learnedByRepo.has(normalizeRepo(seed.repo))).length,
+    learned_count: acceptedRepos.size,
+    pending_count: seeds.filter((seed) => !acceptedRepos.has(normalizeRepo(seed.repo))).length,
     repos: rows,
-    skip_rule: "Seed and daily ingestion check registry/learned_repos.json before selecting repositories; learned repositories are skipped to avoid duplicate absorption."
+    skip_rule: "Seed and daily ingestion skip only accepted records in registry/learned_repos.json; legacy_unreviewed and quarantined records remain eligible for a proper deep dive."
   };
 }

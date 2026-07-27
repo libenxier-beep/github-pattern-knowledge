@@ -26,7 +26,7 @@ type MarkdownItem = {
 type ArchiveRepoRow = {
   repo: string;
   url: string;
-  status: "learned" | "pending";
+  status: "learned" | "legacy_unreviewed" | "quarantined" | "pending";
   rank: number | null;
   priority: "p1" | "p2" | "p3" | null;
   focus: string[];

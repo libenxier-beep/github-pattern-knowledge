@@ -31,7 +31,8 @@ Keep real tokens in `.env.local` or your shell environment. Never commit secrets
 npm test
 npm run typecheck
 npm run build
-EXTRACTOR_MODE=heuristic npm run daily -- --fixture
+npm run automation-preflight
+npm run daily -- --fixture
 npm run harness
 ```
 
@@ -44,8 +45,10 @@ Before opening a pull request:
 - Keep the change focused.
 - Add or update tests for behavior changes.
 - Run `npm test`, `npm run typecheck`, and `npm run build`.
-- Run `EXTRACTOR_MODE=heuristic npm run daily -- --fixture` when scheduler, ingestion, extraction, indexes, cards, or harness behavior changes.
-- Run `npm run harness` when pattern-note shape, evidence, taxonomy, or generated knowledge behavior changes.
+- Run `npm run automation-preflight` from the clean commit intended for scheduled execution.
+- Run `npm run daily -- --fixture` when scheduler, discovery, scoring, ingestion, or preparation behavior changes; it must not publish active knowledge.
+- Run focused finalization tests when evidence, ownership, report, registry, or value-gate behavior changes.
+- Run `npm run harness` when pattern-note shape, evidence, taxonomy, historical locators, or generated knowledge behavior changes.
 - Confirm `git status -sb` does not include secrets, `dist`, `node_modules`, `.env.local`, or private generated knowledge.
 
 ## Knowledge Quality Rules
@@ -65,7 +68,7 @@ Do not treat daily cards as the source of truth. `patterns/` is the durable know
 
 ## LLM Boundary
 
-LLMs may help with pattern extraction and review only from bounded evidence packs. Discovery, scoring, ingestion, source snapshots, harness validation, indexes, learned-repo archive writes, and dashboard reads should remain deterministic.
+LLMs may help a deep-dive agent form candidates from bounded, commit-pinned evidence. Daily preparation never invokes an extractor. Discovery, scoring, ingestion, source snapshots, finalization gates, harness validation, indexes, learned-registry publication, and dashboard reads remain deterministic.
 
 ## Issue Reports
 

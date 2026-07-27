@@ -4,7 +4,7 @@ import type { PatternDraft, RepoContext } from "../types";
 import { stringifyMarkdown } from "../knowledge/frontmatter";
 import { validateCardMarkdown } from "../harness/patternHarness";
 import { ensureDir, writeJson } from "../utils/fs";
-import { getKnowledgePaths, safeKebab, toProjectRelative } from "../utils/paths";
+import { getKnowledgePaths, safeKebab, toKnowledgeRelative } from "../utils/paths";
 import { localDateString } from "../utils/date";
 
 export async function generateDailyCard(
@@ -60,14 +60,14 @@ ${patternNames || acceptedPatternIds.map((id) => `- ${id}`).join("\n")}
 单脚本、小 demo、需求还没稳定的产品原型，不要直接套 registry、provider 或复杂目录分层。先保留可删除的简单方案。
 
 ## 和本地 Agent 工具的关联
-这张卡片只是入口；真正的复用对象是 \`knowledge/patterns/\` 中通过 harness 的 pattern note。Codex 应优先按工程问题检索索引，再读 note 的 Boundary Decisions 和 Transfer Guidance。`;
+这张卡片只是入口；真正的复用对象已按路由写入最合适的 Work Context。Codex 应先按工程问题检索对应 Context，再读 note 的 Boundary Decisions 和 Transfer Guidance。`;
 
   const markdown = stringifyMarkdown(frontmatter, body);
   const filePath = path.join(paths.cardsDir, `${date}-${repoSlug}.md`);
   const result = validateCardMarkdown(path.basename(filePath), markdown);
   if (result.valid) {
     await writeFile(filePath, markdown, "utf8");
-    return toProjectRelative(projectRoot, filePath);
+    return toKnowledgeRelative(projectRoot, filePath, paths.knowledgeRoot);
   }
   const rejectedPath = path.join(paths.rejectedCardsDir, `${context.run_id}-${date}-${repoSlug}.md`);
   await writeFile(rejectedPath, markdown, "utf8");
@@ -75,7 +75,7 @@ ${patternNames || acceptedPatternIds.map((id) => `- ${id}`).join("\n")}
     run_id: context.run_id,
     source_repo: context.repo,
     errors: result.errors,
-    markdown_file: toProjectRelative(projectRoot, rejectedPath)
+    markdown_file: toKnowledgeRelative(projectRoot, rejectedPath, paths.knowledgeRoot)
   });
   return null;
 }

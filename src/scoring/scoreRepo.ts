@@ -1,4 +1,15 @@
 import type { RepoContext, RepoScore, ScoreBreakdown } from "../types";
+import {
+  AI_ENGINEERING_TERMS,
+  CROSS_DOMAIN_MECHANISM_TERMS,
+  DISCOVERY_CAPABILITIES,
+  ENGINEERING_DOMAIN_TERMS,
+  LOCAL_WORK_TERMS,
+  PRODUCTION_CRAFT_TERMS,
+  TRANSFER_BRIDGE_TERMS,
+  contextSearchText,
+  matchTerms
+} from "../discovery/selectionPolicy";
 
 function clamp(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -34,6 +45,14 @@ export function scoreRepoContext(context: RepoContext, now = new Date()): RepoSc
     (p) => p.includes("config")
   ]);
   const hasRelease = Number(context.metadata.releases_count ?? 0) > 0;
+  const selectionText = contextSearchText(context);
+  const aiEngineeringMatches = matchTerms(selectionText, AI_ENGINEERING_TERMS);
+  const engineeringDomainMatches = matchTerms(selectionText, ENGINEERING_DOMAIN_TERMS);
+  const localWorkMatches = matchTerms(selectionText, LOCAL_WORK_TERMS);
+  const productionCraftMatches = matchTerms(selectionText, PRODUCTION_CRAFT_TERMS);
+  const crossDomainMechanismMatches = matchTerms(selectionText, CROSS_DOMAIN_MECHANISM_TERMS);
+  const transferBridgeMatches = matchTerms(selectionText, TRANSFER_BRIDGE_TERMS);
+  const capabilityMatches = DISCOVERY_CAPABILITIES.filter((capability) => matchTerms(selectionText, capability.terms).length > 0).map((capability) => capability.id);
 
   const qualitySignals: Record<string, boolean | number | string | null> = {
     has_tests: hasTests,
@@ -109,6 +128,35 @@ export function scoreRepoContext(context: RepoContext, now = new Date()): RepoSc
     }
   };
 
+  const selectionFit: ScoreBreakdown = {
+    score: clamp(
+      (engineeringDomainMatches.length > 0 || capabilityMatches.length > 0 ? 5 : 0) +
+        Math.min(10, (engineeringDomainMatches.length + capabilityMatches.length) * 2) +
+        Math.min(30, productionCraftMatches.length * 3) +
+        Math.min(20, crossDomainMechanismMatches.length * 3) +
+        Math.min(25, transferBridgeMatches.length * 3) +
+        Math.min(10, localWorkMatches.length * 2)
+    ),
+    reasons: [
+      ...(engineeringDomainMatches.length > 0 || capabilityMatches.length > 0 ? ["engineering_system_source"] : []),
+      ...(aiEngineeringMatches.length > 0 ? ["ai_engineering_source_domain"] : []),
+      ...(localWorkMatches.length > 0 ? ["local_work_environment_alignment"] : []),
+      ...(productionCraftMatches.length >= 3 ? ["production_last_mile_craft"] : []),
+      ...(crossDomainMechanismMatches.length >= 3 ? ["cross_domain_mechanism_density"] : []),
+      ...(transferBridgeMatches.length >= 3 ? ["cross_domain_transfer_bridge"] : []),
+      ...capabilityMatches.map((capability) => `capability:${capability}`)
+    ],
+    signals: {
+      ai_engineering_matches: aiEngineeringMatches,
+      engineering_domain_matches: engineeringDomainMatches,
+      local_work_matches: localWorkMatches,
+      production_craft_matches: productionCraftMatches,
+      cross_domain_mechanism_matches: crossDomainMechanismMatches,
+      transfer_bridge_matches: transferBridgeMatches,
+      capability_matches: capabilityMatches
+    }
+  };
+
   const rejectionReasons: string[] = [];
   if (context.metadata.archived) {
     rejectionReasons.push("archived repo");
@@ -120,12 +168,13 @@ export function scoreRepoContext(context: RepoContext, now = new Date()): RepoSc
     rejectionReasons.push("insufficient analyzable engineering structure");
   }
 
-  const total = engineeringQuality.score * 0.5 + longTermImpact.score * 0.3 + recentHeat.score * 0.2;
+  const total = engineeringQuality.score * 0.38 + selectionFit.score * 0.32 + longTermImpact.score * 0.18 + recentHeat.score * 0.12;
   return {
     repo: context.repo,
     url: context.url,
     total_score: Number(total.toFixed(2)),
     engineering_quality: engineeringQuality,
+    selection_fit: selectionFit,
     long_term_impact: longTermImpact,
     recent_heat: recentHeat,
     selected: false,

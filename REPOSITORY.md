@@ -5,18 +5,18 @@ kind: owned-system
 lifecycle: active
 criticality: frequent
 owner: liben+codex
-last_reviewed: 2026-07-13
+last_reviewed: 2026-07-26
 ---
 
 # GitHub Pattern Knowledge Repository Contract
 
 ## Purpose
 
-This repository implements the local learning loop that discovers or ingests high-quality GitHub repositories, extracts traceable engineering patterns, validates them, and writes reusable knowledge for agents. Its primary users are programming agents, maintainers of the ingestion pipeline, and reviewers of evidence-backed pattern knowledge.
+This repository implements a two-phase local learning system: bounded GitHub discovery/preparation followed by commit-bound, evidence-gated deep finalization. Its primary users are programming agents, maintainers of the pipeline, and reviewers of reusable pattern knowledge.
 
 ## Responsibilities
 
-It owns discovery, scoring, commit-pinned ingestion, bounded extraction and review, the deterministic pattern harness, learned-repository registry writes after successful non-fixture runs, indexes, scheduling, the local dashboard, and deterministic tests. It does not own the generated Work Context as a repository, third-party source repositories, credentials, dependency caches, or automatic publication of private knowledge.
+It owns discovery, scoring, commit-pinned ingestion, source preparation, finalization gates, the deterministic pattern and locator harnesses, status-aware learned-repository registry writes after successful non-fixture deep finalization, indexes, scheduling, the local dashboard, and deterministic tests. Daily and seed preparation do not publish active knowledge. The repository does not own the generated Work Context as a repository, third-party source repositories, credentials, dependency caches, or automatic publication of private knowledge.
 
 ## Authority
 
@@ -24,7 +24,7 @@ Tracked source, tests, configuration, and maintained project documentation are c
 
 ## Lifecycle
 
-The repository is active and frequently used. `liben+codex` maintains it, with the latest governance review on 2026-07-13. Pipeline changes require tests, type checking, build validation, harness checks, and protection of the committed rule that only a successful non-fixture run with at least one accepted pattern may mark a repository learned.
+The repository is active and frequently used. `liben+codex` maintains it, with the latest governance review on 2026-07-26. Pipeline changes require tests, type checking, build validation, harness checks, and protection of the committed rule that only a source-bound non-fixture deep finalization with at least one important, non-obvious, evidence-backed core functional paradigm may mark a repository learned. Every declared paradigm must explain its problem, design choice, mechanism, counterfactual importance, benefits, clever move, tradeoffs, authority boundary, and canonical accepted loop. Supporting mechanisms cannot substitute for the project's defining capabilities, and artifact or Work Context counts are not quality proxies.
 
 ## Relationships
 
@@ -32,7 +32,7 @@ The repository is active and frequently used. `liben+codex` maintains it, with t
 | --- | --- | --- | --- |
 | upstream | https://github.com/libenxier-beep/github-pattern-knowledge.git | no | Configured `origin` and package metadata repository URL. |
 | generation-target | work-contexts:github_engineering_patterns/ | yes | Default `KNOWLEDGE_ROOT` resolves to this Work Context; environment configuration may select another root. |
-| operating-skill | codex-custom-skills:github-engineering-pattern-knowledge | no | Maintained skill package supplies the agent-facing runbook. |
+| discovery-adapter | codex-custom-skills:github-engineering-pattern-knowledge | no | Optional thin skill routes manual requests here; repository docs and code own the workflow. |
 | vendor-input | local-deps/* | no | Ignored third-party Git clones used as bounded local evidence; each retains its own upstream authority. |
 
 ## Branch Policy
@@ -72,7 +72,7 @@ The repository is active and frequently used. `liben+codex` maintains it, with t
 
 ## Operations
 
-Use `npm test`, `npm run typecheck`, `npm run build`, and `npm run harness` before accepting pipeline changes. Use `EXTRACTOR_MODE=heuristic npm run daily -- --fixture` for deterministic end-to-end smoke coverage. In the committed daily and seed flows, `processRepoContext` may update the learned registry only after a non-fixture run succeeds with at least one harness-accepted pattern.
+Use `docs/daily-workflow.md` for the canonical real-run sequence. Use `npm test`, `npm run typecheck`, `npm run build`, and `npm run harness` before accepting pipeline changes. Use `npm run daily -- --fixture` for deterministic preparation smoke coverage. `processRepoContext` writes only a source snapshot and preparation receipt; only `finalizeDeepDive` may publish success metadata and update the learned registry after all source, uniqueness, ownership, evidence, transfer, score, artifact, and report gates pass.
 
 ## Retirement
 

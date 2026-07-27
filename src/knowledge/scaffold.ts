@@ -11,9 +11,9 @@ This knowledge base is optimized for Codex and programming agents that need reus
 
 1. Identify the current project's primary engineering problem.
 2. Search \`knowledge/indexes/by_engineering_problem.json\` for candidate patterns.
-3. Search \`knowledge/indexes/by_tag.json\` when the task already has a concrete label such as \`adapter\`, \`reconciliation_loop\`, \`security\`, \`lifecycle\`, or \`pipeline\`.
-4. Filter by project type when the source or target context is materially different.
-5. Filter by complexity so MVPs do not inherit infrastructure-scale patterns too early.
+3. Search \`knowledge/indexes/by_tag.json\` for concrete labels that actually exist in the generated index, such as \`checkpoint\`, \`bounded-retry\`, \`stale-state\`, \`reconciliation\`, or \`approval\`.
+4. Search \`knowledge/indexes/by_pattern_type.json\` for mechanism classes such as \`pipeline\`, \`capability_boundary\`, or \`lifecycle_hooks\`.
+5. Filter by project type and complexity so small projects do not inherit infrastructure-scale patterns too early.
 6. Open candidate notes and read \`Progressive Disclosure\`, then \`Retrieval Tags\`.
 7. Continue only when \`use_when\` matches and \`avoid_when\` does not match the active task.
 8. Sort by \`quality_score\`, then by \`evidence_strength\` when present.

@@ -69,10 +69,7 @@ export async function runSeedIngest(options: SeedIngestOptions = {}): Promise<Se
         context,
         candidateScores: [score],
         runDate,
-        startedAt: new Date().toISOString(),
-        markLearned: true,
-        learnedRepo: seed.repo,
-        learnedUrl: seed.url
+        startedAt: new Date().toISOString()
       });
       if (run.status === "success") {
         results.push({

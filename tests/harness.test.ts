@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { validatePatternMarkdown } from "../src/harness/patternHarness";
+import { validateCardMarkdown, validatePatternMarkdown } from "../src/harness/patternHarness";
 import type { Taxonomy } from "../src/types";
 
 const taxonomy: Taxonomy = {
@@ -141,6 +141,20 @@ describe("pattern harness", () => {
     expect(result.errors).toContain("missing required section: Retrieval Tags");
   });
 
+  test("rejects malformed core functional paradigm ids when a pattern declares them", () => {
+    const invalid = validPattern.replace(
+      "run_id: run-2026-06-11-001\n",
+      "run_id: run-2026-06-11-001\ncore_functional_paradigm_ids:\n  - Not A Stable Id\n"
+    );
+
+    const result = validatePatternMarkdown("pattern-plugin-registry-lifecycle-hooks.md", invalid, taxonomy);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "core_functional_paradigm_ids must contain kebab-case ids: Not A Stable Id"
+    );
+  });
+
   test("rejects pattern notes without internal progressive disclosure", () => {
     const invalid = validPattern.replace(/## Progressive Disclosure[\s\S]*?\n## Retrieval Tags/, "## Retrieval Tags");
 
@@ -168,5 +182,145 @@ describe("pattern harness", () => {
     expect(result.errors).toContain("missing required section: Evidence Table");
     expect(result.errors).toContain("Evidence Table must mention reference file: src/plugins/registry.ts");
     expect(result.errors).toContain("Evidence Table must mention reference file: tests/plugins/registry.test.ts");
+  });
+
+  test("rejects duplicate or aliased reference files", () => {
+    const invalid = validPattern.replace(
+      "      - tests/plugins/registry.test.ts",
+      "      - src/plugins/registry.ts"
+    );
+
+    const result = validatePatternMarkdown("pattern-plugin-registry-lifecycle-hooks.md", invalid, taxonomy);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("source_repos[0].reference_files must include at least two distinct canonical files");
+  });
+});
+
+const decisionFirstCard = `---
+date: 2026-07-26
+source_repo: owner/project
+source_url: https://github.com/owner/project
+source_commit: ${commitSha}
+patterns:
+  - pattern-plugin-registry-lifecycle-hooks
+card_type: daily_design_card
+run_id: run-2026-07-26-report
+created_at: 2026-07-26
+---
+
+# Project report
+
+## 项目本身做什么
+
+这个项目把大型材料中的对象和关系编译成可查询的任务地图，让使用者先确定影响路径，再决定需要核验哪些原始材料。
+
+## 核心机制如何工作
+
+【输入对象】原始材料、当前任务以及能够回到来源的对象标识。
+
+【判断依据】系统只把可观察关系或明确标记的推断关系用于导航，并在身份不确定时保留候选。
+
+【产生结果】系统返回任务相关的局部关系、来源路径和下一步阅读计划。
+
+【最小例子】当一项发布规则发生变化时，系统从该规则出发找到依赖它的流程和验证项，再把这些对象按来源路径组织成复核清单。
+
+【事实边界】关系地图可能不完整或过期，最终判断仍需回到原始材料与确定性检查。
+
+## 与相邻方法的区别和组合
+
+【区别】关键词检索寻找准确出现，语义检索寻找相似内容，关系图沿已确认连接扩展，渐进式披露控制本轮展示多少。
+
+【组合】先用关键词或语义检索找入口，再确认身份并沿图扩展，随后逐步打开原文，最后运行确定性检查。
+
+## 最重要的迁移
+
+【源码观察】源项目用关系地图规划任务上下文，并让关系路径返回可核验来源。【迁移推论】文档和知识库可以重定义节点、关系、来源、证据等级和失效规则，用同一方法追踪影响、冲突与证据；高风险结论仍应回到原始材料确认。
+
+## 证据附录
+
+固定提交的生产代码与失败测试提供证据。
+`;
+
+describe("daily card harness", () => {
+  test("accepts the decision-first report contract without legacy duplicate headings", () => {
+    const result = validateCardMarkdown("2026-07-26-owner-project.md", decisionFirstCard);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  test("leaves core-paradigm judgment to finalization instead of inferring it from a fixed heading", () => {
+    const freeForm = decisionFirstCard.replace(/## 核心机制如何工作[\s\S]*?\n## 与相邻方法的区别和组合/, "## 设计取舍与组合");
+    const result = validateCardMarkdown("2026-07-26-owner-project.md", freeForm);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  test("grandfathers a complete legacy card created before the decision-first contract", () => {
+    const legacy = `---
+date: 2026-07-25
+source_repo: owner/project
+source_url: https://github.com/owner/project
+patterns:
+  - pattern-plugin-registry-lifecycle-hooks
+card_type: daily_design_card
+run_id: run-2026-07-25-report
+created_at: 2026-07-25
+---
+
+# Legacy report
+
+## 一句话
+摘要。
+## 今天抽取的模式
+模式。
+## 为什么值得学
+理由。
+## 宏观架构启发
+架构。
+## 微决策启发
+决策。
+## 可迁移场景
+场景。
+## 不要照搬的场景
+边界。
+## 和本地 Agent 工具的关联
+关联。
+`;
+
+    const result = validateCardMarkdown("2026-07-25-owner-project.md", legacy);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  test("does not let a new card evade the decision-first contract by using legacy headings", () => {
+    const newLegacy = decisionFirstCard
+      .replace("created_at: 2026-07-26", "created_at: 2026-07-27")
+      .replace(/# Project report[\s\S]*/, `# Regressed report
+
+## 一句话
+摘要。
+## 今天抽取的模式
+模式。
+## 为什么值得学
+理由。
+## 宏观架构启发
+架构。
+## 微决策启发
+决策。
+## 可迁移场景
+场景。
+## 不要照搬的场景
+边界。
+## 和本地 Agent 工具的关联
+关联。`);
+
+    const result = validateCardMarkdown("2026-07-27-owner-project.md", newLegacy);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("report_evidence_appendix_required");
   });
 });

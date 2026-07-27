@@ -20,6 +20,8 @@ export type CreateExtractorOptions = {
 
 export type CreatedExtractor = {
   name: "heuristic" | "llm";
+  requested_mode: ExtractorMode;
+  selection_reason: string;
   extractor: PatternExtractor;
 };
 
@@ -35,7 +37,12 @@ export function createExtractor(options: CreateExtractorOptions = {}): CreatedEx
   const heuristic = new HeuristicExtractor();
 
   if (mode === "heuristic" || (mode === "auto" && !hasOpenAIKey && !options.client)) {
-    return { name: "heuristic", extractor: heuristic };
+    return {
+      name: "heuristic",
+      requested_mode: mode,
+      selection_reason: mode === "heuristic" ? "explicit_heuristic_mode" : "auto_without_openai_key",
+      extractor: heuristic
+    };
   }
   if (mode === "llm" && !hasOpenAIKey && !options.client) {
     throw new Error("EXTRACTOR_MODE=llm requires OPENAI_API_KEY");
@@ -43,11 +50,12 @@ export function createExtractor(options: CreateExtractorOptions = {}): CreatedEx
 
   return {
     name: "llm",
+    requested_mode: mode,
+    selection_reason: options.client ? "explicit_llm_client" : "openai_key_available",
     extractor: new LLMExtractor({
       client: options.client ?? new OpenAIResponsesClient(),
       taxonomy: options.taxonomy ?? DEFAULT_TAXONOMY,
-      reviewer: options.reviewer ?? process.env.LLM_REVIEW !== "0",
-      fallback: heuristic
+      reviewer: options.reviewer ?? process.env.LLM_REVIEW !== "0"
     })
   };
 }

@@ -117,13 +117,21 @@ describe("LLM extractor", () => {
     expect(createExtractor({ mode: "llm", hasOpenAIKey: true, client: new FakeLLMClient([]), taxonomy: DEFAULT_TAXONOMY }).name).toBe("llm");
   });
 
-  test("falls back to heuristic when reviewer rejects every LLM draft", async () => {
+  test("returns no accepted draft when reviewer rejects every LLM draft", async () => {
     const client = new FakeLLMClient([extractionPayload(), { reviews: [{ id: "pattern-capability-lifecycle-registry-llm", decision: "reject", reason: "too generic" }] }]);
     const context = createFixtureRepoContext("run-review-reject", new Date("2026-06-11T00:00:00.000Z"));
 
-    const drafts = await new LLMExtractor({ client, taxonomy: DEFAULT_TAXONOMY, fallback: createExtractor({ mode: "heuristic" }).extractor }).extractPatterns(context);
+    const drafts = await new LLMExtractor({ client, taxonomy: DEFAULT_TAXONOMY }).extractPatterns(context);
 
-    expect(drafts.length).toBeGreaterThan(0);
-    expect(drafts[0].frontmatter.id).not.toBe("pattern-capability-lifecycle-registry-llm");
+    expect(drafts).toEqual([]);
+  });
+
+  test("treats a missing review decision as abstention instead of implicit acceptance", async () => {
+    const client = new FakeLLMClient([extractionPayload(), { reviews: [] }]);
+    const context = createFixtureRepoContext("run-review-abstain", new Date("2026-06-11T00:00:00.000Z"));
+
+    const drafts = await new LLMExtractor({ client, taxonomy: DEFAULT_TAXONOMY }).extractPatterns(context);
+
+    expect(drafts).toEqual([]);
   });
 });

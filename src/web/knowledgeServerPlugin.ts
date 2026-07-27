@@ -37,6 +37,22 @@ async function listFiles(dir: string, extension: string): Promise<string[]> {
   return result.sort();
 }
 
+function timeValue(data: Record<string, unknown>, ...fields: string[]): number {
+  for (const field of fields) {
+    const value = data[field];
+    if (typeof value !== "string") continue;
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function runStatusRank(data: Record<string, unknown>): number {
+  if (data.status === "success") return 2;
+  if (data.status === "failed") return 1;
+  return 0;
+}
+
 async function cards(projectRoot: string) {
   const paths = getKnowledgePaths(projectRoot);
   const files = await listFiles(paths.cardsDir, ".md");
@@ -51,7 +67,11 @@ async function cards(projectRoot: string) {
       };
     })
   );
-  return items.sort((a, b) => String((b.frontmatter as { date?: string }).date ?? "").localeCompare(String((a.frontmatter as { date?: string }).date ?? "")));
+  return items.sort(
+    (a, b) =>
+      timeValue(b.frontmatter as Record<string, unknown>, "created_at", "date") -
+      timeValue(a.frontmatter as Record<string, unknown>, "created_at", "date")
+  );
 }
 
 async function runs(projectRoot: string) {
@@ -61,10 +81,29 @@ async function runs(projectRoot: string) {
   const items = await Promise.all(
     [...files, ...failed].map(async (file) => ({
       file: toProjectRelative(projectRoot, file),
-      data: await readJsonFile(file, {})
+      data: await readJsonFile<Record<string, unknown>>(file, {})
     }))
   );
-  return items.sort((a, b) => String((b.data as { started_at?: string }).started_at ?? "").localeCompare(String((a.data as { started_at?: string }).started_at ?? "")));
+  const logicalRuns = new Map<string, (typeof items)[number]>();
+  for (const item of items) {
+    const runId = typeof item.data.run_id === "string" && item.data.run_id.trim() ? item.data.run_id : item.file;
+    const current = logicalRuns.get(runId);
+    if (!current) {
+      logicalRuns.set(runId, item);
+      continue;
+    }
+    const itemRank = runStatusRank(item.data);
+    const currentRank = runStatusRank(current.data);
+    if (
+      itemRank > currentRank ||
+      (itemRank === currentRank && timeValue(item.data, "finished_at") > timeValue(current.data, "finished_at"))
+    ) {
+      logicalRuns.set(runId, item);
+    }
+  }
+  return [...logicalRuns.values()].sort(
+    (a, b) => timeValue(b.data, "finished_at", "started_at") - timeValue(a.data, "finished_at", "started_at")
+  );
 }
 
 async function rejected(projectRoot: string) {

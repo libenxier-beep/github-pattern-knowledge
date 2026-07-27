@@ -1,39 +1,60 @@
 import type { GitHubClient, GitHubSearchRepo } from "../github/client";
-import { addYears, localDateString } from "../utils/date";
+import { buildCapabilityQueries, compareRepoSearchCandidates, isContentNoiseRepo, type SelectionPolicy } from "./selectionPolicy";
 
-function oneYearAgo(now: Date): string {
-  return localDateString(addYears(now, -1));
-}
+type RepoSearchClient = Pick<GitHubClient, "searchRepos">;
 
-function polluted(repo: GitHubSearchRepo): boolean {
-  const text = `${repo.full_name} ${repo.description ?? ""} ${(repo.topics ?? []).join(" ")}`.toLowerCase();
-  const blocked = ["awesome", "prompt-list", "prompts", "demo", "landing-page", "template-only", "course-list"];
-  return blocked.some((item) => text.includes(item));
+export type DiscoveryOptions = {
+  excludeRepos?: Iterable<string>;
+  limit?: number;
+  maxPages?: number;
+  maxRequests?: number;
+  perPage?: number;
+  selectionPolicy?: SelectionPolicy;
+};
+
+function normalizeRepo(repo: string): string {
+  return repo.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/$/, "").toLowerCase();
 }
 
 export function buildDiscoveryQueries(now = new Date()): string[] {
-  const pushedAfter = oneYearAgo(now);
-  return [
-    `stars:>500 pushed:>${pushedAfter} archived:false`,
-    "topic:cli stars:>300 archived:false",
-    "topic:developer-tools stars:>300 archived:false",
-    "topic:automation stars:>300 archived:false",
-    "topic:testing stars:>300 archived:false",
-    "topic:framework stars:>500 archived:false",
-    "topic:agent stars:>100 archived:false"
-  ];
+  return buildCapabilityQueries(now);
 }
 
-export async function discoverGitHubRepos(client: GitHubClient, now = new Date()): Promise<GitHubSearchRepo[]> {
+export async function discoverGitHubRepos(client: RepoSearchClient, now = new Date(), options: DiscoveryOptions = {}): Promise<GitHubSearchRepo[]> {
   const byRepo = new Map<string, GitHubSearchRepo>();
-  for (const query of buildDiscoveryQueries(now)) {
-    const repos = await client.searchRepos(query, 6);
-    for (const repo of repos) {
-      if (repo.archived || repo.fork || repo.stargazers_count < 100 || polluted(repo)) {
-        continue;
+  const excludeRepos = new Set(Array.from(options.excludeRepos ?? []).map(normalizeRepo));
+  const limit = options.limit ?? 8;
+  const maxPages = options.maxPages ?? 2;
+  const maxRequests = options.maxRequests ?? 10;
+  const perPage = options.perPage ?? 10;
+  const selectionPolicy = options.selectionPolicy;
+  const queries = selectionPolicy ? buildCapabilityQueries(now, selectionPolicy) : buildDiscoveryQueries(now);
+  let requests = 0;
+
+  for (const query of queries) {
+    if (byRepo.size >= limit || requests >= maxRequests) {
+      break;
+    }
+    for (let page = 1; page <= maxPages && byRepo.size < limit && requests < maxRequests; page += 1) {
+      const acceptedBeforePage = byRepo.size;
+      requests += 1;
+      const repos = await client.searchRepos(query, perPage, page);
+      for (const repo of repos) {
+        if (repo.archived || repo.fork || repo.stargazers_count < 10 || isContentNoiseRepo(repo) || excludeRepos.has(normalizeRepo(repo.full_name))) {
+          continue;
+        }
+        byRepo.set(repo.full_name, repo);
+        if (byRepo.size >= limit) {
+          break;
+        }
       }
-      byRepo.set(repo.full_name, repo);
+      if (repos.length === 0) {
+        break;
+      }
+      if (byRepo.size > acceptedBeforePage) {
+        break;
+      }
     }
   }
-  return [...byRepo.values()].sort((a, b) => b.stargazers_count - a.stargazers_count).slice(0, 8);
+  return [...byRepo.values()].sort((a, b) => compareRepoSearchCandidates(a, b, now, selectionPolicy)).slice(0, limit);
 }

@@ -2,7 +2,7 @@ import path from "node:path";
 import type { PatternFrontmatter } from "../types";
 import { parseMarkdown } from "../knowledge/frontmatter";
 import { ensureDir, listMarkdownFiles, writeJson } from "../utils/fs";
-import { toProjectRelative } from "../utils/paths";
+import { toKnowledgeRelative } from "../utils/paths";
 import { readFile } from "node:fs/promises";
 
 export type PatternIndexEntry = {
@@ -57,14 +57,15 @@ export type GenerateIndexesOptions = {
   patternsDir: string;
   indexesDir: string;
   projectRoot: string;
+  knowledgeRoot?: string;
 };
 
-function toEntry(projectRoot: string, filePath: string, frontmatter: PatternFrontmatter): PatternIndexEntry {
+function toEntry(projectRoot: string, filePath: string, frontmatter: PatternFrontmatter, knowledgeRoot?: string): PatternIndexEntry {
   return {
     id: frontmatter.id,
     name: frontmatter.name,
     summary: frontmatter.summary,
-    file: toProjectRelative(projectRoot, filePath),
+    file: toKnowledgeRelative(projectRoot, filePath, knowledgeRoot),
     engineering_problems: frontmatter.engineering_problems,
     project_types: frontmatter.project_types,
     pattern_types: frontmatter.pattern_types,
@@ -118,6 +119,60 @@ function sortAxis(axis: Record<string, AxisEntry[]>): void {
   }
 }
 
+function canonicalId(name: string): string {
+  return `canonical-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort();
+}
+
+function buildCanonicalIndex(entries: PatternIndexEntry[], sourceIndex: string): Record<string, unknown> {
+  const groups = new Map<string, PatternIndexEntry[]>();
+  for (const entry of entries) {
+    const current = groups.get(entry.name) ?? [];
+    current.push(entry);
+    groups.set(entry.name, current);
+  }
+  const patterns = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, group]) => {
+    const sorted = [...group].sort((a, b) => b.quality_score - a.quality_score || b.updated_at.localeCompare(a.updated_at));
+    return {
+      canonical_id: canonicalId(name),
+      name,
+      summary: sorted[0].summary,
+      canonical_group_key: name.toLowerCase(),
+      evidence_count: group.length,
+      quality_score_min: Math.min(...group.map((item) => item.quality_score)),
+      quality_score_max: Math.max(...group.map((item) => item.quality_score)),
+      engineering_problems: uniqueSorted(group.flatMap((item) => item.engineering_problems)),
+      project_types: uniqueSorted(group.flatMap((item) => item.project_types)),
+      pattern_types: uniqueSorted(group.flatMap((item) => item.pattern_types)),
+      transfer_targets: uniqueSorted(group.flatMap((item) => item.transfer_targets)),
+      tags: uniqueSorted(group.flatMap((item) => item.tags)),
+      source_repos: uniqueSorted(group.flatMap((item) => item.source_repos)),
+      evidence: sorted.map((item) => ({
+        id: item.id,
+        file: item.file,
+        source_repos: item.source_repos,
+        quality_score: item.quality_score,
+        project_types: item.project_types,
+        complexity: item.complexity,
+        updated_at: item.updated_at
+      }))
+    };
+  });
+  return {
+    generated_at: new Date().toISOString(),
+    source_index: sourceIndex,
+    purpose: "Canonical grouping layer that separates complete engineering-loop concepts from per-repository evidence samples.",
+    path_policy: "All file paths are repo-relative.",
+    pattern_count: entries.length,
+    canonical_count: patterns.length,
+    duplicate_group_count: patterns.filter((item) => Number(item.evidence_count) > 1).length,
+    patterns
+  };
+}
+
 export async function generateIndexes(options: GenerateIndexesOptions): Promise<IndexBundle> {
   await ensureDir(options.indexesDir);
   const files = await listMarkdownFiles(options.patternsDir);
@@ -129,7 +184,7 @@ export async function generateIndexes(options: GenerateIndexesOptions): Promise<
     if (!frontmatter.id) {
       continue;
     }
-    entries.push(toEntry(options.projectRoot, file, frontmatter));
+    entries.push(toEntry(options.projectRoot, file, frontmatter, options.knowledgeRoot));
   }
 
   sortEntries(entries);
@@ -176,13 +231,17 @@ export async function generateIndexes(options: GenerateIndexesOptions): Promise<
     ["by_complexity.json", bundle.by_complexity],
     ["by_transfer_target.json", bundle.by_transfer_target],
     ["by_source_repo.json", bundle.by_source_repo],
-    ["by_tag.json", bundle.by_tag]
+    ["by_tag.json", bundle.by_tag],
+    [
+      "canonical_patterns.json",
+      buildCanonicalIndex(entries, toKnowledgeRelative(options.projectRoot, path.join(options.indexesDir, "index.json"), options.knowledgeRoot))
+    ]
   ];
 
   for (const [fileName, value] of filesToWrite) {
     const fullPath = path.join(options.indexesDir, fileName);
     await writeJson(fullPath, value);
-    bundle.written_files.push(toProjectRelative(options.projectRoot, fullPath));
+    bundle.written_files.push(toKnowledgeRelative(options.projectRoot, fullPath, options.knowledgeRoot));
   }
 
   return bundle;

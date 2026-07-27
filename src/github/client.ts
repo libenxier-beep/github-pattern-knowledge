@@ -58,9 +58,9 @@ export class GitHubClient {
     return (await response.json()) as T;
   }
 
-  async searchRepos(query: string, perPage = 5): Promise<GitHubSearchRepo[]> {
+  async searchRepos(query: string, perPage = 5, page = 1): Promise<GitHubSearchRepo[]> {
     const data = await this.request<{ items: GitHubSearchRepo[] }>(
-      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}`
+      `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${perPage}&page=${page}`
     );
     return data.items;
   }

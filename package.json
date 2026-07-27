@@ -27,7 +27,9 @@
   },
   "scripts": {
     "dev": "vite",
+    "automation-preflight": "tsx src/cli/automationPreflight.ts",
     "daily": "tsx src/cli/daily.ts",
+    "finalize": "tsx src/cli/finalize.ts",
     "seed": "tsx src/cli/seed.ts",
     "index": "tsx src/cli/indexes.ts",
     "evidence": "tsx src/cli/evidence.ts",

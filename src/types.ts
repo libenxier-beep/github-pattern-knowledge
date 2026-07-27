@@ -34,6 +34,7 @@ export type PatternFrontmatter = {
   created_at: string;
   updated_at: string;
   run_id: string;
+  core_functional_paradigm_ids?: string[];
   aliases?: string[];
   evidence_strength?: EvidenceStrength;
   maturity?: Maturity;
@@ -102,7 +103,7 @@ export type RepoContext = {
 export type ScoreBreakdown = {
   score: number;
   reasons: string[];
-  signals: Record<string, boolean | number | string | null>;
+  signals: Record<string, boolean | number | string | string[] | null>;
 };
 
 export type RepoScore = {
@@ -110,6 +111,7 @@ export type RepoScore = {
   url: string;
   total_score: number;
   engineering_quality: ScoreBreakdown;
+  selection_fit?: ScoreBreakdown;
   long_term_impact: ScoreBreakdown;
   recent_heat: ScoreBreakdown;
   selected: boolean;
@@ -138,9 +140,24 @@ export type RunMetadata = {
   date: string;
   status: "success" | "failed";
   fixture: boolean;
+  extractor_provenance?: {
+    requested_mode: string;
+    effective_mode: string;
+    selection_reason: string;
+    silent_fallback_allowed: false;
+  };
   candidate_scores: RepoScore[];
   selected_repo: RepoScore;
   added_patterns: string[];
+  promoted_patterns: string[];
+  routed_patterns: Array<{
+    id: string;
+    file: string;
+    context: string;
+    disposition: string;
+    reason: string;
+    confidence: string;
+  }>;
   rejected_patterns: string[];
   updated_indexes: string[];
   generated_card: string | null;
@@ -157,6 +174,8 @@ export type RunMetadata = {
 
 export type DailyRunResult = RunMetadata & {
   run_file: string;
+  learned_registry_count?: number;
+  next_pending_seed_repo?: string | null;
 };
 
 export type SeedRepo = {
@@ -173,6 +192,7 @@ export type LearnedRepoRecord = {
   learned_at: string;
   run_id: string;
   pattern_files: string[];
+  status?: "accepted" | "legacy_unreviewed" | "quarantined";
 };
 
 export type LearnedRepoRegistry = {

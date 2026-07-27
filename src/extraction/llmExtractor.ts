@@ -212,7 +212,7 @@ export class LLMExtractor implements PatternExtractor {
       const accepted: PatternDraft[] = [];
       for (const draft of normalized) {
         const decision = reviews.get(draft.frontmatter.id);
-        if (!decision || decision.decision === "accept") {
+        if (decision?.decision === "accept") {
           accepted.push(draft);
         }
       }

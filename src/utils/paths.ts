@@ -48,6 +48,34 @@ export function toProjectRelative(projectRoot: string, filePath: string): string
   return relative.split(path.sep).join("/");
 }
 
+export function toKnowledgeRelative(projectRoot: string, filePath: string, knowledgeRoot = getKnowledgePaths(projectRoot).knowledgeRoot): string {
+  const relative = path.relative(knowledgeRoot, filePath);
+  if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
+    return path.join(path.basename(knowledgeRoot), relative).split(path.sep).join("/");
+  }
+  return toProjectRelative(projectRoot, filePath);
+}
+
+export function getWorkContextsRoot(projectRoot?: string): string {
+  const configuredRoot = process.env.WORK_CONTEXTS_ROOT;
+  if (configuredRoot) {
+    return path.resolve(configuredRoot);
+  }
+  const configuredKnowledgeRoot = process.env.KNOWLEDGE_ROOT;
+  if (configuredKnowledgeRoot) {
+    return path.dirname(path.resolve(configuredKnowledgeRoot));
+  }
+  if (projectRoot && !projectRoot.endsWith(path.join(".codex", "system-projects", "github-pattern-knowledge"))) {
+    return path.join(path.resolve(projectRoot), "work_contexts");
+  }
+  return path.resolve(path.join(os.homedir(), ".codex", "memories", "work_contexts"));
+}
+
+export function toWorkContextRelative(filePath: string, workContextsRoot = getWorkContextsRoot()): string {
+  const relative = path.relative(workContextsRoot, filePath);
+  return path.join("work_contexts", relative).split(path.sep).join("/");
+}
+
 export function safeKebab(input: string, fallback = "item"): string {
   const value = input
     .toLowerCase()

@@ -1,5 +1,7 @@
 import path from "node:path";
 import type { CardFrontmatter, HarnessResult, PatternFrontmatter, Taxonomy } from "../types";
+import { canonicalizePortableLocator } from "../deepDive/valueFunction";
+import { assessHumanReportReadability } from "../deepDive/reportReadability";
 import { parseMarkdown } from "../knowledge/frontmatter";
 
 const REQUIRED_PATTERN_FIELDS: Array<keyof PatternFrontmatter> = [
@@ -46,6 +48,20 @@ const FORBIDDEN_PHRASES = [
   "适合学习架构设计",
   "project structure is clear and worth learning"
 ];
+
+const LEGACY_CARD_SECTIONS = [
+  "一句话",
+  "今天抽取的模式",
+  "为什么值得学",
+  "宏观架构启发",
+  "微决策启发",
+  "可迁移场景",
+  "不要照搬的场景",
+  "和本地 Agent 工具的关联"
+];
+
+const DECISION_FIRST_CARD_SECTIONS = ["项目本身做什么", "核心机制如何工作", "与相邻方法的区别和组合", "最重要的迁移"];
+const DECISION_FIRST_CONTRACT_DATE = "2026-07-26";
 
 function result(errors: string[], warnings: string[] = []): HarnessResult {
   return {
@@ -215,6 +231,14 @@ export function validatePatternMarkdown(fileName: string, markdown: string, taxo
   validateStringArray("avoid_when", frontmatter.avoid_when, errors, 16);
   validateStringArray("tradeoffs", frontmatter.tradeoffs, errors, 16);
   validateStringArray("transfer_targets", frontmatter.transfer_targets, errors);
+  if (frontmatter.core_functional_paradigm_ids !== undefined) {
+    validateStringArray("core_functional_paradigm_ids", frontmatter.core_functional_paradigm_ids, errors);
+    for (const id of asStringArray(frontmatter.core_functional_paradigm_ids)) {
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
+        errors.push(`core_functional_paradigm_ids must contain kebab-case ids: ${id}`);
+      }
+    }
+  }
   if (!Array.isArray(frontmatter.related_patterns)) {
     errors.push("related_patterns must be an array");
   }
@@ -262,11 +286,22 @@ export function validatePatternMarkdown(fileName: string, markdown: string, taxo
       } else if (source.reference_files.length > 4) {
         errors.push(`source_repos[${index}].reference_files must include no more than four files`);
       } else {
+        const canonicalFiles: string[] = [];
         source.reference_files.forEach((file, fileIndex) => {
           if (typeof file !== "string" || file.trim().length < 3) {
             errors.push(`source_repos[${index}].reference_files[${fileIndex}] must be a concrete file path`);
+            return;
           }
+          const locator = canonicalizePortableLocator(file);
+          if (file.includes("#") || !locator.safe || !locator.canonical_form) {
+            errors.push(`source_repos[${index}].reference_files[${fileIndex}] must be a canonical repo-relative file path`);
+            return;
+          }
+          canonicalFiles.push(locator.canonical);
         });
+        if (canonicalFiles.length !== source.reference_files.length || new Set(canonicalFiles).size !== canonicalFiles.length) {
+          errors.push(`source_repos[${index}].reference_files must include at least two distinct canonical files`);
+        }
       }
     });
   }
@@ -322,7 +357,6 @@ export function validatePatternMarkdown(fileName: string, markdown: string, taxo
 export function validateCardMarkdown(fileName: string, markdown: string): HarnessResult {
   const errors: string[] = [];
   const { frontmatter, body } = parseMarkdown<Partial<CardFrontmatter>>(markdown);
-  const required = ["一句话", "今天抽取的模式", "为什么值得学", "宏观架构启发", "微决策启发", "可迁移场景", "不要照搬的场景", "和本地 Agent 工具的关联"];
 
   if (!fileName.endsWith(".md")) {
     errors.push("card file must be Markdown");
@@ -336,9 +370,16 @@ export function validateCardMarkdown(fileName: string, markdown: string): Harnes
   if (!Array.isArray(frontmatter.patterns) || frontmatter.patterns.length === 0) {
     errors.push("card must reference at least one pattern id");
   }
-  for (const heading of required) {
-    if (!body.includes(`## ${heading}`)) {
-      errors.push(`missing card section: ${heading}`);
+  const createdAt = typeof frontmatter.created_at === "string" ? frontmatter.created_at.slice(0, 10) : "";
+  const declaresDecisionFirstShape = DECISION_FIRST_CARD_SECTIONS.some((heading) => body.includes(`## ${heading}`));
+  const requiresDecisionFirstShape = !createdAt || createdAt >= DECISION_FIRST_CONTRACT_DATE || declaresDecisionFirstShape;
+  if (requiresDecisionFirstShape) {
+    errors.push(...assessHumanReportReadability(markdown).errors);
+  } else {
+    for (const heading of LEGACY_CARD_SECTIONS) {
+      if (!body.includes(`## ${heading}`)) {
+        errors.push(`missing card section: ${heading}`);
+      }
     }
   }
   return result(errors);

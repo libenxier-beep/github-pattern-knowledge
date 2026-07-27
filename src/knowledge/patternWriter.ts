@@ -5,7 +5,7 @@ import { stringifyMarkdown } from "./frontmatter";
 import { ensurePatternNavigationSections } from "./retrievalTags";
 import { validatePatternMarkdown } from "../harness/patternHarness";
 import { ensureDir, pathExists, writeJson } from "../utils/fs";
-import { getKnowledgePaths, shortHash, toProjectRelative } from "../utils/paths";
+import { getKnowledgePaths, shortHash, toKnowledgeRelative } from "../utils/paths";
 
 export type WritePatternOutcome = {
   accepted: boolean;
@@ -39,7 +39,7 @@ export async function writePatternDraft(projectRoot: string, draft: PatternDraft
   if (result.valid) {
     const filePath = path.join(paths.patternsDir, `${frontmatter.id}.md`);
     await writeFile(filePath, markdown, "utf8");
-    return { accepted: true, file: toProjectRelative(projectRoot, filePath), result, id: frontmatter.id };
+    return { accepted: true, file: toKnowledgeRelative(projectRoot, filePath, paths.knowledgeRoot), result, id: frontmatter.id };
   }
 
   const rejectedPath = path.join(paths.rejectedPatternsDir, `${frontmatter.run_id}-${frontmatter.id}.md`);
@@ -52,7 +52,7 @@ export async function writePatternDraft(projectRoot: string, draft: PatternDraft
     rejected_at: new Date().toISOString(),
     errors: result.errors,
     warnings: result.warnings,
-    markdown_file: toProjectRelative(projectRoot, rejectedPath)
+    markdown_file: toKnowledgeRelative(projectRoot, rejectedPath, paths.knowledgeRoot)
   });
-  return { accepted: false, file: toProjectRelative(projectRoot, rejectedPath), result, id: frontmatter.id };
+  return { accepted: false, file: toKnowledgeRelative(projectRoot, rejectedPath, paths.knowledgeRoot), result, id: frontmatter.id };
 }

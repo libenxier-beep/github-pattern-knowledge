@@ -1,8 +1,12 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { generateIndexes } from "../src/indexes/generateIndexes";
+
+const execFileAsync = promisify(execFile);
 
 const pattern = (quality: number, id = "pattern-plugin-registry-lifecycle-hooks") => `---
 id: ${id}
@@ -47,7 +51,7 @@ describe("index generator", () => {
     const root = await mkdtemp(path.join(tmpdir(), "pattern-indexes-"));
     const patternsDir = path.join(root, "knowledge", "patterns");
     const indexesDir = path.join(root, "knowledge", "indexes");
-    await import("node:fs/promises").then((fs) => fs.mkdir(patternsDir, { recursive: true }));
+    await mkdir(patternsDir, { recursive: true });
     await writeFile(path.join(patternsDir, "pattern-plugin-registry-lifecycle-hooks.md"), pattern(87), "utf8");
     await writeFile(path.join(patternsDir, "pattern-plugin-registry-lifecycle-hooks-a7f3.md"), pattern(91, "pattern-plugin-registry-lifecycle-hooks-a7f3"), "utf8");
 
@@ -64,5 +68,50 @@ describe("index generator", () => {
     expect(output.index.patterns[0].tags).toEqual(["lifecycle", "extension"]);
     expect(output.by_tag.lifecycle).toHaveLength(2);
     expect(output.written_files.some((file) => file.endsWith("by_tag.json"))).toBe(true);
+  });
+
+  test("uses portable knowledge paths when the knowledge root lives outside the project root", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "pattern-indexes-external-"));
+    const projectRoot = path.join(root, "system-project");
+    const knowledgeRoot = path.join(root, "work_contexts", "github_engineering_patterns");
+    const patternsDir = path.join(knowledgeRoot, "patterns");
+    const indexesDir = path.join(knowledgeRoot, "indexes");
+    const patternFile = path.join(patternsDir, "pattern-plugin-registry-lifecycle-hooks.md");
+    await mkdir(patternsDir, { recursive: true });
+    await writeFile(patternFile, pattern(87), "utf8");
+
+    const output = await generateIndexes({ patternsDir, indexesDir, projectRoot, knowledgeRoot });
+
+    expect(output.index.patterns[0].file).toBe("github_engineering_patterns/patterns/pattern-plugin-registry-lifecycle-hooks.md");
+    expect(output.written_files).toContain("github_engineering_patterns/indexes/index.json");
+    expect(output.index.patterns.some((item) => path.isAbsolute(item.file))).toBe(false);
+    expect(output.written_files.some((file) => path.isAbsolute(file))).toBe(false);
+  });
+
+  test("CLI refuses to index active patterns whose source repository is not accepted", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "pattern-indexes-authority-"));
+    const knowledgeRoot = path.join(root, "github_engineering_patterns");
+    const patternsDir = path.join(knowledgeRoot, "patterns");
+    const registryDir = path.join(knowledgeRoot, "registry");
+    await mkdir(patternsDir, { recursive: true });
+    await mkdir(registryDir, { recursive: true });
+    await writeFile(path.join(patternsDir, "pattern-unaccepted.md"), pattern(91, "pattern-unaccepted"), "utf8");
+    await writeFile(path.join(registryDir, "learned_repos.json"), `${JSON.stringify({
+      generated_at: "2026-07-28T00:00:00.000Z",
+      learned_count: 1,
+      repos: [{ repo: "owner/project", status: "legacy_unreviewed", pattern_files: [] }]
+    })}\n`, "utf8");
+
+    await expect(execFileAsync(
+      path.join(process.cwd(), "node_modules", ".bin", "tsx"),
+      ["src/cli/indexes.ts"],
+      {
+        cwd: process.cwd(),
+        env: { ...process.env, KNOWLEDGE_ROOT: knowledgeRoot, WORK_CONTEXTS_ROOT: root }
+      }
+    )).rejects.toMatchObject({
+      stderr: expect.stringContaining("Knowledge authority integrity failed")
+    });
+    await expect(access(path.join(knowledgeRoot, "indexes", "index.json"))).rejects.toThrow();
   });
 });

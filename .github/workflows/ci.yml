@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify automation deployment contract
+        run: npm run automation-preflight
+
       - name: Run tests
         run: npm test
 
