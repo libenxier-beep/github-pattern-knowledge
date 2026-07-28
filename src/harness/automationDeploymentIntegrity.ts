@@ -11,6 +11,7 @@ export const AUTOMATION_REQUIRED_INTERFACES = [
   "docs/human-report-quality-standard.md",
   "docs/verification-checklist.md",
   "schemas/independent-source-judgment.schema.json",
+  "scripts/automationPreflightBootstrap.mjs",
   "src/cli/automationPreflight.ts",
   "src/cli/daily.ts",
   "src/cli/finalize.ts",
@@ -20,7 +21,7 @@ export const AUTOMATION_REQUIRED_INTERFACES = [
 ] as const;
 
 const REQUIRED_SCRIPTS: Record<string, string> = {
-  "automation-preflight": "tsx src/cli/automationPreflight.ts",
+  "automation-preflight": "node scripts/automationPreflightBootstrap.mjs",
   daily: "tsx src/cli/daily.ts",
   finalize: "tsx src/cli/finalize.ts",
   harness: "tsx src/cli/harness.ts"

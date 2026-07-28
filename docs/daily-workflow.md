@@ -33,7 +33,7 @@ Preparation, review drafts, and routed drafts are not learned knowledge. Only su
 ### 1. Preflight
 
 - Use a clean isolated checkout of this tool repository.
-- Run `npm run automation-preflight` from that checkout before reading or executing the remaining workflow. Stop on any error.
+- Run `npm run automation-preflight` from that checkout before reading or executing the remaining workflow. This command owns lockfile-based dependency bootstrap for a fresh checkout, then enters the tracked TypeScript deployment validator. Stop on any bootstrap or validation error.
 - Read `REPOSITORY.md`, this document, and the human-report quality standard.
 - Inspect bounded automation memory only for current state and reader preferences.
 - Do not edit the pipeline, automation, skills, or memory during the scheduled run.

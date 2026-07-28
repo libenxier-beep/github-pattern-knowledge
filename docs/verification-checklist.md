@@ -1,6 +1,7 @@
 # Verification Checklist
 
 - run `npm run automation-preflight` from the clean commit that the automation will execute
+- repeat preflight from a fresh checkout with no `node_modules`; confirm it installs from `package-lock.json` before entering the TypeScript validator
 - confirm the repository-owned independent-review schema passes its focused API-compatibility test
 
 - `npm test`
