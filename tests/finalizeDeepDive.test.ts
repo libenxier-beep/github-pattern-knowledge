@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -8,6 +8,7 @@ import { finalizeDeepDive } from "../src/scheduler/finalizeDeepDive";
 import type { DeepDiveManifest } from "../src/deepDive/valueFunction";
 import { DEFAULT_TAXONOMY } from "../src/knowledge/defaultSchemas";
 import { readLearnedRepoRegistry } from "../src/knowledge/repoRegistry";
+import { acquireRunLease, inspectRunLease } from "../src/scheduler/runLease";
 
 const execFile = promisify(execFileCallback);
 
@@ -389,6 +390,37 @@ created_at: 2026-07-26
 }
 
 describe("deep-dive finalizer", () => {
+  test("validates run-owned drafts, publishes them at final targets, and releases the whole-run lease", async () => {
+    const { projectRoot, manifestPath } = await fixture(true);
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as DeepDiveManifest;
+    const targets = [manifest.report_file, ...manifest.units.map((unit) => unit.artifact_file)];
+    manifest.publication_plan = [];
+    for (const [index, target] of targets.entries()) {
+      const staged = `knowledge/sources/run-finalize/drafts/${index}.md`;
+      const sourcePath = path.join(projectRoot, "work_contexts", target);
+      const stagedPath = path.join(projectRoot, staged);
+      await mkdir(path.dirname(stagedPath), { recursive: true });
+      await rename(sourcePath, stagedPath);
+      manifest.publication_plan.push({ staged_file: staged, target_file: target });
+    }
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+    const lease = await acquireRunLease(projectRoot, manifest.run_id, new Date("2026-07-29T00:00:00.000Z"));
+    const runPath = path.join(projectRoot, "knowledge", "runs", "failed", "run-finalize.json");
+    const run = JSON.parse(await readFile(runPath, "utf8"));
+    await writeFile(runPath, `${JSON.stringify({
+      ...run,
+      automation_lease: { token: lease.token, started_at: lease.started_at }
+    }, null, 2)}\n`, "utf8");
+
+    await finalizeDeepDive({ projectRoot, manifestPath });
+
+    for (const target of targets) {
+      await expect(readFile(path.join(projectRoot, "work_contexts", target), "utf8")).resolves.toContain("#");
+    }
+    await expect(inspectRunLease(projectRoot)).resolves.toBeNull();
+  });
+
   test("registers only artifacts that pass the value gate and exist", async () => {
     const { projectRoot, manifestPath } = await fixture(true);
     const result = await finalizeDeepDive({ projectRoot, manifestPath });

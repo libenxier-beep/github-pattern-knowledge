@@ -15,6 +15,8 @@ import { localDateString } from "../utils/date";
 import { getPendingSeeds } from "../seeds/seedPool";
 import { readLearnedRepoRegistry, learnedRepoSet } from "../knowledge/repoRegistry";
 import { processRepoContext } from "./processRepo";
+import { acquireRunLease, inspectRunLease } from "./runLease";
+import { writeJson } from "../utils/fs";
 
 export type RunDailyOptions = {
   projectRoot?: string;
@@ -208,6 +210,10 @@ async function runDailyUnlocked(options: RunDailyOptions = {}): Promise<DailyRun
   const id = runId(runDate);
   const startedAt = new Date().toISOString();
   await ensureKnowledgeScaffold(projectRoot);
+  if (!options.forceFixture) {
+    const activeRun = await inspectRunLease(projectRoot);
+    if (activeRun) throw new Error(`Unfinished automation run blocks discovery: ${activeRun.run_id}`);
+  }
 
   let contextAndScores: { context: RepoContext; scores: RepoScore[] };
   let githubFailure: string | undefined;
@@ -232,7 +238,7 @@ async function runDailyUnlocked(options: RunDailyOptions = {}): Promise<DailyRun
     }
   }
 
-  const result = await processRepoContext({
+  let result = await processRepoContext({
     projectRoot,
     context: contextAndScores.context,
     candidateScores: contextAndScores.scores,
@@ -240,6 +246,16 @@ async function runDailyUnlocked(options: RunDailyOptions = {}): Promise<DailyRun
     startedAt,
     githubFailure
   });
+  if (!result.fixture) {
+    const lease = await acquireRunLease(projectRoot, result.run_id, new Date(startedAt));
+    result = {
+      ...result,
+      automation_lease: { token: lease.token, started_at: lease.started_at }
+    };
+    const failedRunPath = path.join(getKnowledgePaths(projectRoot).failedRunsDir, `${result.run_id}.json`);
+    const { run_file: _runFile, learned_registry_count: _learned, next_pending_seed_repo: _next, ...metadata } = result;
+    await writeJson(failedRunPath, metadata);
+  }
   const learned = await readLearnedRepoRegistry(projectRoot);
   const pendingSeeds = await getPendingSeeds(projectRoot);
   return {

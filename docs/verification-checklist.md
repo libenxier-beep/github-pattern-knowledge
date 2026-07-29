@@ -3,7 +3,10 @@
 - run `npm run automation-preflight` from the clean commit that the automation will execute
 - repeat preflight from a fresh checkout with no `node_modules`; confirm it installs from `package-lock.json` before entering the TypeScript validator
 - repeat preflight from an identified fresh worktree with both root variables unset; confirm it still reports the canonical Work Context roots, the authoritative registry counts, and the same next pending seed
+- confirm the fresh worktree resolves GitHub authentication through the host `gh` Keychain without copying or printing the token
+- confirm preflight reports Feishu bot readiness, canonical authority writeability, active-run state, and any deterministic publication recovery in the same JSON result
 - confirm an unidentified checkout with unset roots and a missing or inconsistent registry fails closed before `npm run daily`
+- confirm automation memory is not consulted by code or caller policy for next-seed selection
 - confirm the repository-owned independent-review schema passes its focused API-compatibility test
 
 - `npm test`
@@ -19,6 +22,8 @@
 - confirm negative cases reject missing or malformed core paradigms, supporting implementation details promoted as defining paradigms, shallow reader receipts, source/transfer blur, and unpinned paradigm evidence
 - confirm finalization rejects a missing/tampered checkout receipt, ignored/untracked or assume-unchanged evidence, same-file evidence aliases, artifact evidence that exceeds the manifest/Git HEAD, unbound or schema-invalid pattern artifacts, path aliases, and conflicting replay
 - confirm a late registry failure restores the prior failed run and leaves no success/finalization receipt
+- confirm a real preparation leaves a durable whole-run lease, a second preparation is rejected, matching finalization releases it, explicit abort records a receipt, and an expired lease is recoverable
+- confirm accepted report/pattern bytes remain under run-owned drafts until finalization; simulate an interrupted partial publication and confirm preflight restores prior targets when the registry was not committed
 - inspect `run_locator_integrity` in the harness result; every historical local locator must resolve and `parse_errors` plus `shape_errors` must both be empty
 - inspect `knowledge_authority_integrity`; active pattern/card sources must be accepted, related ids must resolve to active or explicit routed artifacts, and accepted registry files must exist
 - when the authoritative Work Context changes, also run its repository validator, lifecycle audit, and router behavior evaluation

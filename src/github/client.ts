@@ -1,5 +1,6 @@
 import type { RepoMetadata } from "../types";
 import { loadDotEnvLocal } from "../utils/env";
+import { resolveGitHubCredential } from "./credentials";
 
 export type GitHubSearchRepo = {
   full_name: string;
@@ -35,7 +36,7 @@ export class GitHubClient {
 
   constructor(options: { token?: string; baseUrl?: string } = {}) {
     loadDotEnvLocal();
-    this.token = options.token ?? process.env.GITHUB_TOKEN;
+    this.token = resolveGitHubCredential({ explicitToken: options.token }).token;
     this.baseUrl = options.baseUrl ?? "https://api.github.com";
   }
 

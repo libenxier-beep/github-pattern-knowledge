@@ -4,7 +4,7 @@ import { readFile, realpath, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml } from "yaml";
-import { readJson, pathExists, writeJson } from "../utils/fs";
+import { ensureDir, readJson, pathExists, writeJson } from "../utils/fs";
 import { getKnowledgePaths, getWorkContextsRoot, toKnowledgeRelative, toWorkContextRelative } from "../utils/paths";
 import { assessHumanReportReadability } from "../deepDive/reportReadability";
 import {
@@ -18,9 +18,18 @@ import { loadTaxonomy } from "../knowledge/taxonomy";
 import { validateCardMarkdown, validatePatternMarkdown } from "../harness/patternHarness";
 import type { LocalRepoReceipt } from "../deepDive/localRepo";
 import { acquireDailyFileLock } from "./daily";
+import { completeRunLease, inspectRunLease } from "./runLease";
+import {
+  beginPublicationTransaction,
+  finishPublicationTransaction,
+  rollbackPublicationTransaction
+} from "./publicationTransaction";
 
 const execFile = promisify(execFileCallback);
 const ACCEPTED_KINDS = new Set(["canonical_loop", "implementation_detail", "context_pattern"]);
+
+type ArtifactInput = { file: string; authorityRoot: string };
+type ArtifactInputResolver = (locator: string) => ArtifactInput;
 
 type ReaderReviewReceipt = {
   reviewer_role?: unknown;
@@ -164,6 +173,7 @@ type SourceRun = {
   fixture?: unknown;
   selected_repo?: { repo?: unknown };
   source_snapshot?: unknown;
+  automation_lease?: { token?: unknown; started_at?: unknown };
   [key: string]: unknown;
 };
 
@@ -346,7 +356,7 @@ async function requirePrimaryValueEvidence(
 async function requireEvidenceAndArtifactProvenance(
   manifest: DeepDiveManifest,
   checkoutPath: string,
-  workContextsRoot: string
+  resolveInput: ArtifactInputResolver
 ): Promise<void> {
   for (const unit of manifest.units.filter((item) => ACCEPTED_KINDS.has(item.kind))) {
     const evidenceFiles = unit.evidence_refs.map(evidenceFile);
@@ -362,7 +372,7 @@ async function requireEvidenceAndArtifactProvenance(
       }
     }
 
-    const artifactPath = resolveArtifact(workContextsRoot, unit.artifact_file);
+    const artifactPath = resolveInput(unit.artifact_file).file;
     const metadata = frontmatter(await readFile(artifactPath, "utf8"));
     const sourceRepos = Array.isArray(metadata?.source_repos) ? metadata.source_repos : [];
     const matchingSources = sourceRepos.filter((candidate) => {
@@ -402,7 +412,7 @@ async function requireEvidenceAndArtifactProvenance(
 
 async function requireCoreParadigmsPersisted(
   manifest: DeepDiveManifest,
-  workContextsRoot: string
+  resolveInput: ArtifactInputResolver
 ): Promise<void> {
   const canonicalUnits = new Map(
     manifest.units
@@ -418,7 +428,7 @@ async function requireCoreParadigmsPersisted(
     }
     let artifact = artifactCache.get(unit.artifact_file);
     if (!artifact) {
-      const markdown = await readFile(resolveArtifact(workContextsRoot, unit.artifact_file), "utf8");
+      const markdown = await readFile(resolveInput(unit.artifact_file).file, "utf8");
       artifact = {
         metadata: frontmatter(markdown),
         coreSection: markdownSection(markdown, "Core Functional Paradigm")
@@ -444,15 +454,15 @@ async function requireCoreParadigmsPersisted(
 async function requireAcceptedArtifactsPassHarness(
   manifest: DeepDiveManifest,
   projectRoot: string,
-  workContextsRoot: string
+  resolveInput: ArtifactInputResolver
 ): Promise<void> {
   const taxonomy = await loadTaxonomy(projectRoot);
   for (const unit of manifest.units.filter((item) => ACCEPTED_KINDS.has(item.kind))) {
-    const artifactPath = resolveArtifact(workContextsRoot, unit.artifact_file);
+    const artifactPath = resolveInput(unit.artifact_file).file;
     let harness;
     try {
       harness = validatePatternMarkdown(
-        path.basename(artifactPath),
+        path.basename(unit.artifact_file),
         await readFile(artifactPath, "utf8"),
         taxonomy
       );
@@ -573,6 +583,51 @@ async function registryContainsFinalization(
   }
 }
 
+function buildArtifactInputResolver(
+  manifest: DeepDiveManifest,
+  workContextsRoot: string,
+  knowledgeRoot: string,
+  sourcesDir: string,
+  requireCompletePlan: boolean
+): { resolveInput: ArtifactInputResolver; publicationEntries: Array<{ staged: string; target: string }> } {
+  const planned = new Map<string, { staged: string; target: string }>();
+  for (const entry of manifest.publication_plan ?? []) {
+    const target = resolveArtifact(workContextsRoot, entry.target_file);
+    const staged = resolveSourceFile(workContextsRoot, knowledgeRoot, sourcesDir, entry.staged_file, "staged publication");
+    const requiredDraftRoot = path.resolve(sourcesDir, manifest.run_id, "drafts");
+    if (staged !== requiredDraftRoot && !staged.startsWith(`${requiredDraftRoot}${path.sep}`)) {
+      throw new Error(`Deep-dive staged publication is not owned by run drafts: ${entry.staged_file}`);
+    }
+    if (planned.has(entry.target_file)) {
+      throw new Error(`Deep-dive duplicate publication target: ${entry.target_file}`);
+    }
+    planned.set(entry.target_file, { staged, target });
+  }
+
+  const requiredTargets = new Set([
+    manifest.report_file,
+    ...manifest.units.filter((unit) => ACCEPTED_KINDS.has(unit.kind)).map((unit) => unit.artifact_file)
+  ]);
+  if (requireCompletePlan) {
+    for (const target of requiredTargets) {
+      if (!planned.has(target)) throw new Error(`Deep-dive publication plan missing target: ${target}`);
+    }
+    for (const target of planned.keys()) {
+      if (!requiredTargets.has(target)) throw new Error(`Deep-dive publication plan contains unowned target: ${target}`);
+    }
+  }
+
+  return {
+    resolveInput(locator: string): ArtifactInput {
+      const entry = planned.get(locator);
+      return entry
+        ? { file: entry.staged, authorityRoot: sourcesDir }
+        : { file: resolveArtifact(workContextsRoot, locator), authorityRoot: workContextsRoot };
+    },
+    publicationEntries: [...planned.values()]
+  };
+}
+
 async function finalizeDeepDiveUnlocked(options: FinalizeDeepDiveOptions): Promise<FinalizeDeepDiveResult> {
   const manifestBytes = await readFile(path.resolve(options.manifestPath));
   const manifest = JSON.parse(manifestBytes.toString("utf8")) as DeepDiveManifest;
@@ -601,6 +656,25 @@ async function finalizeDeepDiveUnlocked(options: FinalizeDeepDiveOptions): Promi
     currentRunPath,
     failedRunPath
   );
+  const activeLease = await inspectRunLease(options.projectRoot);
+  if (existing.automation_lease) {
+    if (
+      !activeLease ||
+      activeLease.run_id !== manifest.run_id ||
+      activeLease.token !== existing.automation_lease.token
+    ) {
+      throw new Error(`Deep-dive automation run lease mismatch: ${manifest.run_id}`);
+    }
+  } else if (activeLease && activeLease.run_id !== manifest.run_id) {
+    throw new Error(`Deep-dive blocked by unfinished automation run: ${activeLease.run_id}`);
+  }
+  const { resolveInput, publicationEntries } = buildArtifactInputResolver(
+    manifest,
+    workContextsRoot,
+    knowledgePaths.knowledgeRoot,
+    knowledgePaths.sourcesDir,
+    Boolean(existing.automation_lease)
+  );
   const checkout = await requirePinnedCheckout(
     manifest,
     workContextsRoot,
@@ -614,18 +688,19 @@ async function finalizeDeepDiveUnlocked(options: FinalizeDeepDiveOptions): Promi
     ...manifest.units.map((unit) => unit.artifact_file)
   ];
   for (const file of required) {
-    if (!(await isRegularFileWithin(resolveArtifact(workContextsRoot, file), workContextsRoot))) {
+    const input = resolveInput(file);
+    if (!(await isRegularFileWithin(input.file, input.authorityRoot))) {
       throw new Error(`Deep-dive artifact missing: ${file}`);
     }
   }
   await requirePrimaryValueEvidence(manifest, checkout.checkoutPath);
-  await requireEvidenceAndArtifactProvenance(manifest, checkout.checkoutPath, workContextsRoot);
-  await requireAcceptedArtifactsPassHarness(manifest, options.projectRoot, workContextsRoot);
-  await requireCoreParadigmsPersisted(manifest, workContextsRoot);
+  await requireEvidenceAndArtifactProvenance(manifest, checkout.checkoutPath, resolveInput);
+  await requireAcceptedArtifactsPassHarness(manifest, options.projectRoot, resolveInput);
+  await requireCoreParadigmsPersisted(manifest, resolveInput);
   await requireIndependentReaderReview(manifest, workContextsRoot);
 
   const reportPath = resolveArtifact(workContextsRoot, manifest.report_file);
-  const reportMarkdown = await readFile(reportPath, "utf8");
+  const reportMarkdown = await readFile(resolveInput(manifest.report_file).file, "utf8");
   const reportReadability = assessHumanReportReadability(reportMarkdown);
   if (!reportReadability.valid) {
     throw new Error(`Deep-dive report gate failed: ${reportReadability.errors.join(", ")}`);
@@ -689,8 +764,19 @@ async function finalizeDeepDiveUnlocked(options: FinalizeDeepDiveOptions): Promi
   const failedSnapshot = await captureFile(failedRunPath);
   const currentSnapshot = await captureFile(currentRunPath);
   const receiptSnapshot = await captureFile(receiptPath);
+  const publicationSnapshots = new Map<string, FileSnapshot>();
+  for (const entry of publicationEntries) publicationSnapshots.set(entry.target, await captureFile(entry.target));
   let registryCommitted = false;
   try {
+    await beginPublicationTransaction(options.projectRoot, manifest.run_id, publicationEntries.map((entry) => ({
+      target_file: toWorkContextRelative(entry.target, workContextsRoot),
+      target_path: entry.target,
+      staged_path: entry.staged
+    })));
+    for (const entry of publicationEntries) {
+      await ensureDir(path.dirname(entry.target));
+      await writeFile(entry.target, await readFile(entry.staged));
+    }
     await writeJson(receiptPath, receipt);
     await writeJson(currentRunPath, successfulRun);
     if (failedSnapshot !== null) {
@@ -715,17 +801,25 @@ async function finalizeDeepDiveUnlocked(options: FinalizeDeepDiveOptions): Promi
       registryCommitted = await registryContainsFinalization(options.projectRoot, manifest, learnedFiles);
       if (!registryCommitted) throw error;
     }
+    await finishPublicationTransaction(options.projectRoot, manifest.run_id, "committed");
   } catch (error) {
     if (!registryCommitted) {
       try {
         await restoreFile(failedRunPath, failedSnapshot);
         await restoreFile(currentRunPath, currentSnapshot);
         await restoreFile(receiptPath, receiptSnapshot);
+        for (const entry of publicationEntries) {
+          await restoreFile(entry.target, publicationSnapshots.get(entry.target) ?? null);
+        }
+        await rollbackPublicationTransaction(options.projectRoot, manifest.run_id);
       } catch (rollbackError) {
         throw new AggregateError([error, rollbackError], "Deep-dive finalization failed and rollback was incomplete");
       }
     }
     throw error;
+  }
+  if (activeLease?.run_id === manifest.run_id) {
+    await completeRunLease(options.projectRoot, activeLease.run_id, activeLease.token);
   }
   return {
     ...gate,

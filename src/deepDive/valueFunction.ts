@@ -110,6 +110,10 @@ export type DeepDiveManifest = {
   report_file: string;
   reader_review_file: string;
   audit_files: string[];
+  publication_plan?: Array<{
+    staged_file: string;
+    target_file: string;
+  }>;
   primary_value_thesis: PrimaryValueThesis;
   units: DeepDiveUnit[];
 };

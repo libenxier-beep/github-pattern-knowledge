@@ -28,6 +28,7 @@
   "scripts": {
     "dev": "vite",
     "automation-preflight": "node scripts/automationPreflightBootstrap.mjs",
+    "automation-abort": "tsx src/cli/automationAbort.ts",
     "daily": "tsx src/cli/daily.ts",
     "finalize": "tsx src/cli/finalize.ts",
     "seed": "tsx src/cli/seed.ts",

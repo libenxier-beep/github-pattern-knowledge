@@ -14,16 +14,22 @@ export const AUTOMATION_REQUIRED_INTERFACES = [
   "docs/verification-checklist.md",
   "schemas/independent-source-judgment.schema.json",
   "scripts/automationPreflightBootstrap.mjs",
+  "src/cli/automationAbort.ts",
   "src/cli/automationPreflight.ts",
   "src/cli/daily.ts",
   "src/cli/finalize.ts",
   "src/cli/harness.ts",
+  "src/github/credentials.ts",
+  "src/harness/automationReadiness.ts",
   "src/harness/automationDeploymentIntegrity.ts",
-  "src/scheduler/finalizeDeepDive.ts"
+  "src/scheduler/finalizeDeepDive.ts",
+  "src/scheduler/publicationTransaction.ts",
+  "src/scheduler/runLease.ts"
 ] as const;
 
 const REQUIRED_SCRIPTS: Record<string, string> = {
   "automation-preflight": "node scripts/automationPreflightBootstrap.mjs",
+  "automation-abort": "tsx src/cli/automationAbort.ts",
   daily: "tsx src/cli/daily.ts",
   finalize: "tsx src/cli/finalize.ts",
   harness: "tsx src/cli/harness.ts"
@@ -49,20 +55,23 @@ async function git(projectRoot: string, args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-export async function validateAutomationDeployment(projectRoot: string): Promise<AutomationDeploymentResult> {
+export async function validateAutomationDeployment(
+  projectRoot: string,
+  rootOverrides: { knowledgeRoot?: string; workContextsRoot?: string } = {}
+): Promise<AutomationDeploymentResult> {
   const errors: string[] = [];
   let commit: string | null = null;
   const isolatedCheckout = !isGitHubPatternKnowledgeCheckout(projectRoot);
-  const knowledgeRoot = getKnowledgePaths(projectRoot).knowledgeRoot;
-  const workContextsRoot = getWorkContextsRoot(projectRoot);
+  const knowledgeRoot = path.resolve(rootOverrides.knowledgeRoot ?? getKnowledgePaths(projectRoot).knowledgeRoot);
+  const workContextsRoot = path.resolve(rootOverrides.workContextsRoot ?? getWorkContextsRoot(projectRoot));
   let learnedRegistryCount: number | null = null;
   let seedRegistryCount: number | null = null;
   let nextPendingSeedRepo: string | null = null;
 
-  if (isolatedCheckout && !process.env.KNOWLEDGE_ROOT) {
+  if (isolatedCheckout && !process.env.KNOWLEDGE_ROOT && !rootOverrides.knowledgeRoot) {
     errors.push("KNOWLEDGE_ROOT is not bound for isolated automation checkout");
   }
-  if (isolatedCheckout && !process.env.WORK_CONTEXTS_ROOT) {
+  if (isolatedCheckout && !process.env.WORK_CONTEXTS_ROOT && !rootOverrides.workContextsRoot) {
     errors.push("WORK_CONTEXTS_ROOT is not bound for isolated automation checkout");
   }
   if (knowledgeRoot !== path.join(workContextsRoot, "github_engineering_patterns")) {

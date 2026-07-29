@@ -34,7 +34,6 @@ export type LLMExtractorOptions = {
   client?: LLMClient;
   taxonomy?: Taxonomy;
   reviewer?: boolean;
-  fallback?: PatternExtractor;
 };
 
 function asString(value: unknown): string {
@@ -177,13 +176,13 @@ export class LLMExtractor implements PatternExtractor {
   private readonly client: LLMClient;
   private readonly taxonomy: Taxonomy;
   private readonly reviewer: boolean;
-  private readonly fallback?: PatternExtractor;
-
   constructor(options: LLMExtractorOptions = {}) {
+    if ("fallback" in options) {
+      throw new Error("LLM heuristic fallback is prohibited; model or reviewer failure must stop the run");
+    }
     this.client = options.client ?? new OpenAIResponsesClient();
     this.taxonomy = options.taxonomy ?? DEFAULT_TAXONOMY;
     this.reviewer = options.reviewer ?? true;
-    this.fallback = options.fallback;
   }
 
   async extractPatterns(context: RepoContext, score?: RepoScore, runDate = new Date()): Promise<PatternDraft[]> {
@@ -199,7 +198,7 @@ export class LLMExtractor implements PatternExtractor {
         .slice(0, 3)
         .map((pattern) => normalizeRawPattern(pattern, context, this.taxonomy, score, runDate));
       if (!this.reviewer || normalized.length === 0) {
-        return normalized.length > 0 ? normalized : this.fallback?.extractPatterns(context, score, runDate) ?? [];
+        return normalized;
       }
 
       const review = await this.client.completeJson<LLMReviewResponse>("pattern_review", {
@@ -216,11 +215,8 @@ export class LLMExtractor implements PatternExtractor {
           accepted.push(draft);
         }
       }
-      return accepted.length > 0 ? accepted : this.fallback?.extractPatterns(context, score, runDate) ?? [];
+      return accepted;
     } catch (error) {
-      if (this.fallback) {
-        return this.fallback.extractPatterns(context, score, runDate);
-      }
       throw error;
     }
   }

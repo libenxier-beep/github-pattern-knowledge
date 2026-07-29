@@ -170,6 +170,10 @@ export type RunMetadata = {
   failure_reason?: string;
   started_at: string;
   finished_at: string;
+  automation_lease?: {
+    token: string;
+    started_at: string;
+  };
 };
 
 export type DailyRunResult = RunMetadata & {

@@ -15,12 +15,17 @@ const requiredFiles = [
   "docs/verification-checklist.md",
   "schemas/independent-source-judgment.schema.json",
   "scripts/automationPreflightBootstrap.mjs",
+  "src/cli/automationAbort.ts",
   "src/cli/automationPreflight.ts",
   "src/cli/daily.ts",
   "src/cli/finalize.ts",
   "src/cli/harness.ts",
+  "src/github/credentials.ts",
+  "src/harness/automationReadiness.ts",
   "src/harness/automationDeploymentIntegrity.ts",
-  "src/scheduler/finalizeDeepDive.ts"
+  "src/scheduler/finalizeDeepDive.ts",
+  "src/scheduler/publicationTransaction.ts",
+  "src/scheduler/runLease.ts"
 ];
 
 async function makeRepo(): Promise<string> {
@@ -40,6 +45,7 @@ async function writeContract(root: string): Promise<void> {
   await writeFile(path.join(root, "package.json"), JSON.stringify({
     scripts: {
       "automation-preflight": "node scripts/automationPreflightBootstrap.mjs",
+      "automation-abort": "tsx src/cli/automationAbort.ts",
       daily: "tsx src/cli/daily.ts",
       finalize: "tsx src/cli/finalize.ts",
       harness: "tsx src/cli/harness.ts"

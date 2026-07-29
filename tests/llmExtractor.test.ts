@@ -134,4 +134,13 @@ describe("LLM extractor", () => {
 
     expect(drafts).toEqual([]);
   });
+
+  test("rejects a configured heuristic fallback at the production LLM boundary", () => {
+    expect(() => new LLMExtractor({
+      client: new FakeLLMClient([]),
+      fallback: { extractPatterns: async () => [] }
+    } as unknown as ConstructorParameters<typeof LLMExtractor>[0])).toThrow(
+      "LLM heuristic fallback is prohibited"
+    );
+  });
 });

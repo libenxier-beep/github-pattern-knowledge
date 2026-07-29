@@ -15,6 +15,8 @@ This document is the canonical operating rule for one real GitHub Pattern Knowle
 | Report mechanical gates | `src/deepDive/reportReadability.ts` |
 | Publication, provenance, and registry mutation | `src/scheduler/finalizeDeepDive.ts` |
 | Regression behavior | `tests/` and `src/harness/` |
+| Pending-seed progress | `registry/learned_repos.json` compared with `registry/seed_repos.json` |
+| Reader preferences and latest-run projection | bounded automation memory; advisory only |
 | Schedule, recipient, and delivery credentials | the calling automation |
 
 When prose and executable validation disagree, stop the run and repair the repository contract. Do not weaken an executable gate from inside a learning run.
@@ -33,12 +35,12 @@ Preparation, review drafts, and routed drafts are not learned knowledge. Only su
 ### 1. Preflight
 
 - Use a clean isolated checkout of this tool repository.
-- Run `npm run automation-preflight` from that checkout before reading or executing the remaining workflow. This command owns lockfile-based dependency bootstrap for a fresh checkout, then enters the tracked TypeScript deployment validator. The validator binds an identified checkout to the canonical Work Context independently of its worktree path, verifies both registries, and reports the resolved knowledge root, Work Contexts root, learned count, seed count, and next pending seed. Stop on any bootstrap, authority-binding, registry, or validation error.
+- Run `npm run automation-preflight` from that checkout before reading or executing the remaining workflow. This command owns lockfile-based dependency bootstrap for a fresh checkout, then enters the tracked readiness validator. In one result it verifies the clean tool commit, canonical roots and registries, read/write authority, authenticated GitHub capability, Feishu bot identity, pending-seed selection, unfinished runs, and interrupted publication recovery. Stop on any readiness error.
 - Read `REPOSITORY.md`, this document, and the human-report quality standard.
-- Inspect bounded automation memory only for current state and reader preferences.
+- Inspect bounded automation memory only for reader preferences and a human-readable latest-run projection. Never compare its “next seed” wording with the registry or use it to select, skip, or block a repository; the registries are the sole progress authority.
 - Do not edit the pipeline, automation, skills, or memory during the scheduled run.
 - Treat the current checkout and commit as the only tool authority. Never read a sibling working tree, copy uncommitted workflow files, or create a synthetic commit from another dirty checkout to satisfy a missing interface.
-- Let the repository's knowledge-root lock serialize preparation and finalization. Stop if isolation or locking fails.
+- The short knowledge-root lock serializes individual mutations. A durable whole-run lease then owns the interval from real preparation through finalization. A second run must resume or explicitly abort the first; the next scheduled preflight deterministically recovers expired leases and interrupted publication journals.
 
 ### 2. Prepare once
 
@@ -73,7 +75,7 @@ Use the repository-owned `schemas/independent-source-judgment.schema.json` for t
 
 Create source synthesis, candidate, accepted, rejected, checkout, reader-review, report, and manifest artifacts for the same run and pinned commit. Route each accepted unit to the Work Context that owns its responsibility boundary. Keep source observations distinct from transfer inferences.
 
-Keep proposed reports and pattern notes under the run's `sources/runs/<run_id>/drafts/` evidence area while judgment or reader review is incomplete. Materialize reviewed artifacts at their final owner paths only for the bounded finalization attempt. If the attempt is interrupted or fails before the registry commit, return every newly materialized artifact to that run's draft area before another run or index build; the knowledge-authority harness must remain green.
+Keep proposed reports and pattern notes under the run's `sources/<run_id>/drafts/` evidence area. The manifest's publication plan maps each reviewed draft to its final owner path. Callers must never materialize those files themselves: finalization validates the staged bytes, writes a durable publication journal, publishes them, and commits the registry. A normal failure rolls back immediately; after a process or machine interruption, the next preflight either completes a registry-backed commit or restores every prior target before allowing another run.
 
 The human report is not the durable learning surface. Every declared core functional paradigm must also be carried by its canonical Work Context pattern: list the paradigm id in `core_functional_paradigm_ids` and explain the same problem, design choice, mechanism, counterfactual importance, non-obvious move, benefits, and limits under `## Core Functional Paradigm`. Supporting implementation units remain in their owning contexts and must not displace the defining paradigm in the canonical note.
 
@@ -88,6 +90,14 @@ npm run finalize -- --manifest /absolute/path/value_manifest.json
 ```
 
 Finalization is the only publication seam. Do not hand-edit the learned registry or reinterpret a failed gate as partial success.
+
+If source analysis, independent review, report construction, or verification stops before finalization, release the active run explicitly:
+
+```bash
+npm run automation-abort -- --run-id <run-id> --reason "<exact failed gate>"
+```
+
+This records an abort receipt; it does not mark the repository learned.
 
 ### 8. Verify and deliver
 
