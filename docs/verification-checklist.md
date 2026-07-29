@@ -2,6 +2,8 @@
 
 - run `npm run automation-preflight` from the clean commit that the automation will execute
 - repeat preflight from a fresh checkout with no `node_modules`; confirm it installs from `package-lock.json` before entering the TypeScript validator
+- repeat preflight from an identified fresh worktree with both root variables unset; confirm it still reports the canonical Work Context roots, the authoritative registry counts, and the same next pending seed
+- confirm an unidentified checkout with unset roots and a missing or inconsistent registry fails closed before `npm run daily`
 - confirm the repository-owned independent-review schema passes its focused API-compatibility test
 
 - `npm test`

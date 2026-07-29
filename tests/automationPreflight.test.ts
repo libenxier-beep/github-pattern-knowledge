@@ -49,7 +49,111 @@ async function writeContract(root: string): Promise<void> {
   await execFileAsync("git", ["commit", "-qm", "fixture"], { cwd: root });
 }
 
+async function writeAuthority(root: string): Promise<{ knowledgeRoot: string; workContextsRoot: string }> {
+  const workContextsRoot = path.join(root, "work_contexts");
+  const knowledgeRoot = path.join(workContextsRoot, "github_engineering_patterns");
+  const registryRoot = path.join(knowledgeRoot, "registry");
+  await mkdir(registryRoot, { recursive: true });
+  await writeFile(
+    path.join(registryRoot, "learned_repos.json"),
+    JSON.stringify({
+      generated_at: "2026-07-29T00:00:00.000Z",
+      learned_count: 1,
+      repos: [{ repo: "fastify/fastify", status: "accepted" }]
+    })
+  );
+  await writeFile(
+    path.join(registryRoot, "seed_repos.json"),
+    JSON.stringify({
+      seed_count: 2,
+      repos: [
+        { rank: 1, repo: "fastify/fastify" },
+        { rank: 2, repo: "kubernetes/kubernetes" }
+      ]
+    })
+  );
+  return { knowledgeRoot, workContextsRoot };
+}
+
 describe("automation deployment preflight", () => {
+  test("rejects an isolated automation checkout when canonical knowledge roots are not bound", async () => {
+    const root = await makeRepo();
+    await writeContract(root);
+    const previousKnowledgeRoot = process.env.KNOWLEDGE_ROOT;
+    const previousWorkContextsRoot = process.env.WORK_CONTEXTS_ROOT;
+
+    delete process.env.KNOWLEDGE_ROOT;
+    delete process.env.WORK_CONTEXTS_ROOT;
+    try {
+      const result = await validateAutomationDeployment(root);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain("KNOWLEDGE_ROOT is not bound for isolated automation checkout");
+      expect(result.errors).toContain("WORK_CONTEXTS_ROOT is not bound for isolated automation checkout");
+    } finally {
+      if (previousKnowledgeRoot === undefined) delete process.env.KNOWLEDGE_ROOT;
+      else process.env.KNOWLEDGE_ROOT = previousKnowledgeRoot;
+      if (previousWorkContextsRoot === undefined) delete process.env.WORK_CONTEXTS_ROOT;
+      else process.env.WORK_CONTEXTS_ROOT = previousWorkContextsRoot;
+    }
+  });
+
+  test("accepts an identified tool worktree through repository-owned canonical root binding", async () => {
+    const root = await makeRepo();
+    await writeContract(root);
+    await writeFile(
+      path.join(root, "REPOSITORY.md"),
+      "---\nschema_version: 1\nrepository_id: github-pattern-knowledge\n---\n",
+      "utf8"
+    );
+    await execFileAsync("git", ["add", "REPOSITORY.md"], { cwd: root });
+    await execFileAsync("git", ["commit", "-qm", "identify tool checkout"], { cwd: root });
+    const previousKnowledgeRoot = process.env.KNOWLEDGE_ROOT;
+    const previousWorkContextsRoot = process.env.WORK_CONTEXTS_ROOT;
+
+    delete process.env.KNOWLEDGE_ROOT;
+    delete process.env.WORK_CONTEXTS_ROOT;
+    try {
+      const result = await validateAutomationDeployment(root);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    } finally {
+      if (previousKnowledgeRoot === undefined) delete process.env.KNOWLEDGE_ROOT;
+      else process.env.KNOWLEDGE_ROOT = previousKnowledgeRoot;
+      if (previousWorkContextsRoot === undefined) delete process.env.WORK_CONTEXTS_ROOT;
+      else process.env.WORK_CONTEXTS_ROOT = previousWorkContextsRoot;
+    }
+  });
+
+  test("reports the bound authority and next pending seed before a scheduled run", async () => {
+    const root = await makeRepo();
+    await writeContract(root);
+    const authority = await writeAuthority(await mkdtemp(path.join(os.tmpdir(), "gpk-authority-")));
+    const previousKnowledgeRoot = process.env.KNOWLEDGE_ROOT;
+    const previousWorkContextsRoot = process.env.WORK_CONTEXTS_ROOT;
+
+    process.env.KNOWLEDGE_ROOT = authority.knowledgeRoot;
+    process.env.WORK_CONTEXTS_ROOT = authority.workContextsRoot;
+    try {
+      const result = await validateAutomationDeployment(root);
+
+      expect(result).toMatchObject({
+        valid: true,
+        knowledgeRoot: authority.knowledgeRoot,
+        workContextsRoot: authority.workContextsRoot,
+        learnedRegistryCount: 1,
+        seedRegistryCount: 2,
+        nextPendingSeedRepo: "kubernetes/kubernetes"
+      });
+    } finally {
+      if (previousKnowledgeRoot === undefined) delete process.env.KNOWLEDGE_ROOT;
+      else process.env.KNOWLEDGE_ROOT = previousKnowledgeRoot;
+      if (previousWorkContextsRoot === undefined) delete process.env.WORK_CONTEXTS_ROOT;
+      else process.env.WORK_CONTEXTS_ROOT = previousWorkContextsRoot;
+    }
+  });
+
   test("bootstraps locked dependencies before preflight in a fresh checkout", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "gpk-automation-bootstrap-"));
     const bin = path.join(root, "bin");
@@ -159,12 +263,24 @@ chmod +x node_modules/.bin/tsx
   test("accepts a clean commit containing the complete caller contract", async () => {
     const root = await makeRepo();
     await writeContract(root);
+    const authority = await writeAuthority(await mkdtemp(path.join(os.tmpdir(), "gpk-authority-")));
+    const previousKnowledgeRoot = process.env.KNOWLEDGE_ROOT;
+    const previousWorkContextsRoot = process.env.WORK_CONTEXTS_ROOT;
 
-    const result = await validateAutomationDeployment(root);
+    process.env.KNOWLEDGE_ROOT = authority.knowledgeRoot;
+    process.env.WORK_CONTEXTS_ROOT = authority.workContextsRoot;
+    try {
+      const result = await validateAutomationDeployment(root);
 
-    expect(result.valid).toBe(true);
-    expect(result.errors).toEqual([]);
-    expect(result.commit).toMatch(/^[a-f0-9]{40}$/);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+      expect(result.commit).toMatch(/^[a-f0-9]{40}$/);
+    } finally {
+      if (previousKnowledgeRoot === undefined) delete process.env.KNOWLEDGE_ROOT;
+      else process.env.KNOWLEDGE_ROOT = previousKnowledgeRoot;
+      if (previousWorkContextsRoot === undefined) delete process.env.WORK_CONTEXTS_ROOT;
+      else process.env.WORK_CONTEXTS_ROOT = previousWorkContextsRoot;
+    }
   });
 
   test("rejects a checkout that does not contain the committed finalize contract", async () => {

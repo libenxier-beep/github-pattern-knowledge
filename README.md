@@ -140,6 +140,8 @@ For the local Codex system project, the default knowledge root is:
 $HOME/.codex/memories/work_contexts/github_engineering_patterns/
 ```
 
+The default is bound by the tracked `repository_id`, not by the checkout directory name, so isolated automation worktrees resolve to the same authority. Unidentified checkouts must bind both roots explicitly; deployment preflight fails before discovery when that binding or either registry is missing or inconsistent.
+
 Use isolated roots for tests or migrations:
 
 ```bash

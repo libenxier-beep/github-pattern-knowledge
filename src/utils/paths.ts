@@ -1,5 +1,6 @@
 import path from "node:path";
 import os from "node:os";
+import { readFileSync } from "node:fs";
 
 export type KnowledgePaths = {
   projectRoot: string;
@@ -19,12 +20,25 @@ export function getProjectRoot(projectRoot = process.cwd()): string {
   return path.resolve(projectRoot);
 }
 
+export function isGitHubPatternKnowledgeCheckout(projectRoot = process.cwd()): boolean {
+  const root = getProjectRoot(projectRoot);
+  const canonicalProjectRoot = path.join(os.homedir(), ".codex", "system-projects", "github-pattern-knowledge");
+  if (root === canonicalProjectRoot) return true;
+  try {
+    const contract = readFileSync(path.join(root, "REPOSITORY.md"), "utf8");
+    return /^repository_id:\s*github-pattern-knowledge\s*$/m.test(contract);
+  } catch {
+    return false;
+  }
+}
+
 export function getKnowledgePaths(projectRoot = process.cwd()): KnowledgePaths {
   const root = getProjectRoot(projectRoot);
   const configuredRoot = process.env.KNOWLEDGE_ROOT;
   const defaultWorkContextRoot = path.join(os.homedir(), ".codex", "memories", "work_contexts", "github_engineering_patterns");
-  const isSystemProject = root.endsWith(path.join(".codex", "system-projects", "github-pattern-knowledge"));
-  const knowledgeRoot = path.resolve(configuredRoot ?? (isSystemProject ? defaultWorkContextRoot : path.join(root, "knowledge")));
+  const knowledgeRoot = path.resolve(
+    configuredRoot ?? (isGitHubPatternKnowledgeCheckout(root) ? defaultWorkContextRoot : path.join(root, "knowledge"))
+  );
   return {
     projectRoot: root,
     knowledgeRoot,
@@ -65,7 +79,7 @@ export function getWorkContextsRoot(projectRoot?: string): string {
   if (configuredKnowledgeRoot) {
     return path.dirname(path.resolve(configuredKnowledgeRoot));
   }
-  if (projectRoot && !projectRoot.endsWith(path.join(".codex", "system-projects", "github-pattern-knowledge"))) {
+  if (projectRoot && !isGitHubPatternKnowledgeCheckout(projectRoot)) {
     return path.join(path.resolve(projectRoot), "work_contexts");
   }
   return path.resolve(path.join(os.homedir(), ".codex", "memories", "work_contexts"));

@@ -33,7 +33,7 @@ Preparation, review drafts, and routed drafts are not learned knowledge. Only su
 ### 1. Preflight
 
 - Use a clean isolated checkout of this tool repository.
-- Run `npm run automation-preflight` from that checkout before reading or executing the remaining workflow. This command owns lockfile-based dependency bootstrap for a fresh checkout, then enters the tracked TypeScript deployment validator. Stop on any bootstrap or validation error.
+- Run `npm run automation-preflight` from that checkout before reading or executing the remaining workflow. This command owns lockfile-based dependency bootstrap for a fresh checkout, then enters the tracked TypeScript deployment validator. The validator binds an identified checkout to the canonical Work Context independently of its worktree path, verifies both registries, and reports the resolved knowledge root, Work Contexts root, learned count, seed count, and next pending seed. Stop on any bootstrap, authority-binding, registry, or validation error.
 - Read `REPOSITORY.md`, this document, and the human-report quality standard.
 - Inspect bounded automation memory only for current state and reader preferences.
 - Do not edit the pipeline, automation, skills, or memory during the scheduled run.
