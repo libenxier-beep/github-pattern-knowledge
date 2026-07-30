@@ -70,7 +70,7 @@ Keep secrets in the shell environment or `.env.local`. Do not commit tokens, loc
 
 ```bash
 npm run daily                 # select and snapshot one candidate
-npm run automation-preflight  # verify the scheduled-run contract is committed and clean
+npm run --silent automation-preflight  # emit one machine-readable JSON readiness result
 npm run daily -- --fixture    # deterministic preparation smoke test
 npm run daily -- --skip-seeds # bypass pending seeds for discovery
 npm run seed -- --list        # list pending seed repositories

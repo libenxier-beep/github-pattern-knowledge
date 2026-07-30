@@ -163,8 +163,19 @@ describe("automation deployment preflight", () => {
   test("bootstraps locked dependencies before preflight in a fresh checkout", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "gpk-automation-bootstrap-"));
     const bin = path.join(root, "bin");
+    const bootstrap = path.resolve("scripts/automationPreflightBootstrap.mjs");
+    const npmCli = process.env.npm_execpath;
+    if (!npmCli) throw new Error("npm_execpath is required for the public preflight seam test");
     await mkdir(bin, { recursive: true });
-    await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "bootstrap-fixture" }));
+    await writeFile(
+      path.join(root, "package.json"),
+      JSON.stringify({
+        name: "bootstrap-fixture",
+        scripts: {
+          "automation-preflight": `"${process.execPath}" "${bootstrap}"`
+        }
+      })
+    );
     await writeFile(path.join(root, "package-lock.json"), JSON.stringify({ lockfileVersion: 3 }));
 
     const fakeTsx = path.join(root, "fake-tsx");
@@ -174,16 +185,16 @@ describe("automation deployment preflight", () => {
     const fakeNpm = path.join(bin, "npm");
     await writeFile(fakeNpm, `#!/bin/sh
 printf '%s\\n' "$*" > npm-args.txt
+printf '%s\\n' 'locked dependencies ready'
 mkdir -p node_modules/.bin
 cp fake-tsx node_modules/.bin/tsx
 chmod +x node_modules/.bin/tsx
 `);
     await chmod(fakeNpm, 0o755);
 
-    const bootstrap = path.resolve("scripts/automationPreflightBootstrap.mjs");
     let outcome: { code: number; stdout: string; stderr: string };
     try {
-      const result = await execFileAsync(process.execPath, [bootstrap], {
+      const result = await execFileAsync(process.execPath, [npmCli, "run", "--silent", "automation-preflight"], {
         cwd: root,
         env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` }
       });
@@ -197,8 +208,10 @@ chmod +x node_modules/.bin/tsx
       };
     }
 
-    expect(outcome).toMatchObject({ code: 0, stderr: "" });
-    expect(outcome.stdout).toContain('"bootstrapped":true');
+    expect(outcome.code).toBe(0);
+    expect(JSON.parse(outcome.stdout)).toEqual({ valid: true, bootstrapped: true });
+    expect(outcome.stderr).toContain("automation bootstrap: reconciling locked dependencies for this checkout");
+    expect(outcome.stderr).toContain("locked dependencies ready");
     expect((await readFile(path.join(root, "npm-args.txt"), "utf8")).trim()).toBe(
       "ci --no-audit --no-fund"
     );

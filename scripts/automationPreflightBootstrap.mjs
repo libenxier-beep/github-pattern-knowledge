@@ -17,9 +17,13 @@ async function exists(file, mode = constants.F_OK) {
   }
 }
 
-async function run(command, args) {
+async function run(command, args, stdout = process.stdout) {
   return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: projectRoot, env: process.env, stdio: "inherit" });
+    const child = spawn(command, args, {
+      cwd: projectRoot,
+      env: process.env,
+      stdio: ["inherit", stdout, process.stderr]
+    });
     child.once("error", reject);
     child.once("exit", (code, signal) => resolve({ code, signal }));
   });
@@ -31,9 +35,9 @@ if (!(await exists(lockfile))) {
   process.exit(1);
 }
 
-console.log("automation bootstrap: reconciling locked dependencies for this checkout");
+console.error("automation bootstrap: reconciling locked dependencies for this checkout");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const install = await run(npm, ["ci", "--no-audit", "--no-fund"]);
+const install = await run(npm, ["ci", "--no-audit", "--no-fund"], process.stderr);
 if (install.signal) {
   console.error(`automation bootstrap failed: npm ci terminated by ${install.signal}`);
   process.exit(1);
