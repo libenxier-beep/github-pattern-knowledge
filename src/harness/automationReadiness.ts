@@ -15,6 +15,7 @@ import { validateAutomationDeployment, type AutomationDeploymentResult } from ".
 
 const execFile = promisify(execFileCallback);
 const ACTIVE_RUN_FILE = ".github-pattern-knowledge-active-run.json";
+const DEFAULT_WORK_CONTEXT_CHECK_TIMEOUT_MS = 90_000;
 
 export type FeishuCapability = {
   ready: boolean;
@@ -28,6 +29,7 @@ export type AutomationReadinessOptions = {
   resolveGitHub?: () => GitHubCredential;
   checkFeishu?: () => Promise<FeishuCapability>;
   checkWorkContexts?: () => Promise<{ ready: boolean; checks: string[] }>;
+  workContextCheckTimeoutMs?: number;
   recoverExpiredLease?: boolean;
   now?: Date;
 };
@@ -69,7 +71,10 @@ async function readActiveRun(knowledgeRoot: string): Promise<RunLease | null> {
   }
 }
 
-async function defaultWorkContextCheck(workContextsRoot: string): Promise<{ ready: boolean; checks: string[] }> {
+async function defaultWorkContextCheck(
+  workContextsRoot: string,
+  timeoutMs: number
+): Promise<{ ready: boolean; checks: string[] }> {
   const checks: Array<[string, string[]]> = [
     ["validate", ["scripts/validate_work_contexts.py"]],
     ["routing", ["scripts/route_context.py", "--evaluate", "--format", "text"]],
@@ -77,7 +82,7 @@ async function defaultWorkContextCheck(workContextsRoot: string): Promise<{ read
   ];
   try {
     await Promise.all(checks.map(([, args]) =>
-      execFile("python3", args, { cwd: workContextsRoot, timeout: 30_000, maxBuffer: 4 * 1024 * 1024 })
+      execFile("python3", args, { cwd: workContextsRoot, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 })
     ));
     return { ready: true, checks: checks.map(([name]) => name) };
   } catch {
@@ -100,7 +105,10 @@ export async function validateAutomationReadiness(
   const feishu = await (options.checkFeishu ?? defaultFeishuCheck)();
   if (!feishu.ready) errors.push("Feishu bot profile github-pattern-report unavailable");
 
-  const workContexts = await (options.checkWorkContexts ?? (() => defaultWorkContextCheck(workContextsRoot)))();
+  const workContextCheckTimeoutMs = options.workContextCheckTimeoutMs ?? DEFAULT_WORK_CONTEXT_CHECK_TIMEOUT_MS;
+  const workContexts = await (
+    options.checkWorkContexts ?? (() => defaultWorkContextCheck(workContextsRoot, workContextCheckTimeoutMs))
+  )();
   if (!workContexts.ready) errors.push("Canonical Work Context validation, routing, or lifecycle audit failed");
 
   let authorityWritable = true;

@@ -79,4 +79,38 @@ describe("automation readiness", () => {
       "Feishu bot profile github-pattern-report unavailable"
     ]));
   });
+
+  test("uses the caller's bounded Work Context check budget", async () => {
+    const context = await fixture();
+    const scriptsRoot = path.join(context.workContextsRoot, "scripts");
+    await mkdir(scriptsRoot, { recursive: true });
+    await Promise.all([
+      writeFile(path.join(scriptsRoot, "validate_work_contexts.py"), "import time\ntime.sleep(0.1)\n"),
+      writeFile(path.join(scriptsRoot, "route_context.py"), "import time\ntime.sleep(0.1)\n"),
+      writeFile(path.join(scriptsRoot, "audit_artifact_lifecycle.py"), "import time\ntime.sleep(0.1)\n")
+    ]);
+
+    const common = {
+      knowledgeRoot: context.knowledgeRoot,
+      workContextsRoot: context.workContextsRoot,
+      resolveGitHub: () => ({ token: "never-print-me", source: "gh_keychain" as const }),
+      checkFeishu: async () => ({
+        ready: true,
+        profile: "github-pattern-report" as const,
+        identity: "bot" as const
+      })
+    };
+    const tooShort = await validateAutomationReadiness(context.projectRoot, {
+      ...common,
+      workContextCheckTimeoutMs: 25
+    });
+    const sufficient = await validateAutomationReadiness(context.projectRoot, {
+      ...common,
+      workContextCheckTimeoutMs: 1_000
+    });
+
+    expect(tooShort.valid).toBe(false);
+    expect(tooShort.errors).toContain("Canonical Work Context validation, routing, or lifecycle audit failed");
+    expect(sufficient.valid).toBe(true);
+  });
 });
