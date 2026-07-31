@@ -216,7 +216,7 @@ chmod +x node_modules/.bin/tsx
     expect(outcome.stderr).toContain("automation bootstrap: reconciling locked dependencies for this checkout");
     expect(outcome.stderr).toContain("locked dependencies ready");
     expect((await readFile(path.join(root, "npm-args.txt"), "utf8")).trim()).toBe(
-      "ci --no-audit --no-fund"
+      "ci --no-audit --no-fund --ignore-scripts"
     );
   }, 15_000);
 
@@ -278,7 +278,7 @@ chmod +x node_modules/.bin/tsx
 
     expect(result.stdout).toContain('"reconciled":true');
     expect((await readFile(path.join(root, "npm-args.txt"), "utf8")).trim()).toBe(
-      "ci --no-audit --no-fund"
+      "ci --no-audit --no-fund --ignore-scripts"
     );
   }, 15_000);
 

@@ -1,7 +1,7 @@
 # Verification Checklist
 
 - run `npm run --silent automation-preflight` from the clean commit that the automation will execute; stdout must parse as one JSON readiness result while bootstrap/install diagnostics stay on stderr
-- repeat preflight from a fresh checkout with no `node_modules`; confirm it installs from `package-lock.json` before entering the TypeScript validator
+- repeat preflight from a fresh checkout with no `node_modules`; confirm it installs from `package-lock.json` with package lifecycle scripts disabled before entering the TypeScript validator
 - repeat preflight from an identified fresh worktree with both root variables unset; confirm it still reports the canonical Work Context roots, the authoritative registry counts, and the same next pending seed
 - confirm the fresh worktree resolves GitHub authentication through the host `gh` Keychain without copying or printing the token
 - confirm preflight reports Feishu bot readiness, canonical authority writeability, active-run state, and any deterministic publication recovery in the same JSON result

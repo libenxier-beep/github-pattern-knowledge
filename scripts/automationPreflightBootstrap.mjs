@@ -37,7 +37,7 @@ if (!(await exists(lockfile))) {
 
 console.error("automation bootstrap: reconciling locked dependencies for this checkout");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const install = await run(npm, ["ci", "--no-audit", "--no-fund"], process.stderr);
+const install = await run(npm, ["ci", "--no-audit", "--no-fund", "--ignore-scripts"], process.stderr);
 if (install.signal) {
   console.error(`automation bootstrap failed: npm ci terminated by ${install.signal}`);
   process.exit(1);
