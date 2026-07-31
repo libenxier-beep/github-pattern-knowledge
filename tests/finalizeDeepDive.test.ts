@@ -863,4 +863,27 @@ describe("deep-dive finalizer", () => {
     await expect(finalizeDeepDive({ projectRoot, manifestPath })).rejects.toThrow("pinned checkout is dirty");
     expect((await readLearnedRepoRegistry(projectRoot)).learned_count).toBe(0);
   });
+
+  test("rejects finalization when the tool standards changed after preparation", async () => {
+    const { projectRoot, manifestPath } = await fixture(true);
+    await writeFile(path.join(projectRoot, ".gitignore"), "*\n!.gitignore\n!fixed-standard.md\n", "utf8");
+    await writeFile(path.join(projectRoot, "fixed-standard.md"), "original standard\n", "utf8");
+    await execFile("git", ["init", "--quiet"], { cwd: projectRoot });
+    await execFile("git", ["add", ".gitignore", "fixed-standard.md"], { cwd: projectRoot });
+    await execFile("git", [
+      "-c", "user.name=Finalizer Authority Test",
+      "-c", "user.email=finalizer-authority@example.test",
+      "commit", "--quiet", "-m", "prepared authority"
+    ], { cwd: projectRoot });
+    const { stdout } = await execFile("git", ["rev-parse", "HEAD"], { cwd: projectRoot });
+    const runPath = path.join(projectRoot, "knowledge", "runs", "failed", "run-finalize.json");
+    const run = JSON.parse(await readFile(runPath, "utf8"));
+    await writeFile(runPath, `${JSON.stringify({ ...run, tooling_commit: stdout.trim() }, null, 2)}\n`, "utf8");
+
+    await writeFile(path.join(projectRoot, "fixed-standard.md"), "weakened standard\n", "utf8");
+    await expect(finalizeDeepDive({ projectRoot, manifestPath })).rejects.toThrow(
+      "tooling authority is dirty"
+    );
+    expect((await readLearnedRepoRegistry(projectRoot)).learned_count).toBe(0);
+  });
 });

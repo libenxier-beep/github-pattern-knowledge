@@ -17,6 +17,7 @@ import { readLearnedRepoRegistry, learnedRepoSet } from "../knowledge/repoRegist
 import { processRepoContext } from "./processRepo";
 import { acquireRunLease, inspectRunLease } from "./runLease";
 import { writeJson } from "../utils/fs";
+import { readToolingCommit } from "./finalizationRepairPolicy";
 
 export type RunDailyOptions = {
   projectRoot?: string;
@@ -209,6 +210,10 @@ async function runDailyUnlocked(options: RunDailyOptions = {}): Promise<DailyRun
   const runDate = options.runDate ?? new Date();
   const id = runId(runDate);
   const startedAt = new Date().toISOString();
+  const toolingCommit = options.forceFixture ? undefined : await readToolingCommit(projectRoot);
+  if (!options.forceFixture && !toolingCommit) {
+    throw new Error("Daily preparation requires a clean, verifiable tooling Git commit");
+  }
   await ensureKnowledgeScaffold(projectRoot);
   if (!options.forceFixture) {
     const activeRun = await inspectRunLease(projectRoot);
@@ -250,6 +255,7 @@ async function runDailyUnlocked(options: RunDailyOptions = {}): Promise<DailyRun
     const lease = await acquireRunLease(projectRoot, result.run_id, new Date(startedAt));
     result = {
       ...result,
+      tooling_commit: toolingCommit ?? undefined,
       automation_lease: { token: lease.token, started_at: lease.started_at }
     };
     const failedRunPath = path.join(getKnowledgePaths(projectRoot).failedRunsDir, `${result.run_id}.json`);

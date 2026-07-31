@@ -76,6 +76,7 @@ npm run daily -- --skip-seeds # bypass pending seeds for discovery
 npm run seed -- --list        # list pending seed repositories
 npm run seed -- --limit 3     # prepare up to three pending seeds
 npm run finalize -- --manifest /absolute/path/value_manifest.json
+npm run finalization-repair-plan -- --run-id <run-id> --attempt 1 --error "<exact finalization error>"
 npm run index                 # regenerate active retrieval indexes
 npm run evidence              # maintain legacy evidence tables
 npm run harness               # validate active notes, cards, and run locators
@@ -84,6 +85,8 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+Failed prepublication content gates stay in the same run: the caller may repair only run-owned report, audit, and manifest artifacts for up to three rounds, then rerun finalization. The preparation commit fixes the evaluator for the run; changing standards, tests, schemas, skills, or workflow code is a hard failure rather than a repair strategy.
 
 ## Phase 1: Preparation
 

@@ -17,10 +17,10 @@ async function fixture(): Promise<{ projectRoot: string; knowledgeRoot: string; 
   const tracked = [
     "package.json", "REPOSITORY.md", "docs/daily-workflow.md", "docs/human-report-quality-standard.md",
     "docs/verification-checklist.md", "schemas/independent-source-judgment.schema.json",
-    "scripts/automationPreflightBootstrap.mjs", "src/cli/automationPreflight.ts", "src/cli/automationAbort.ts", "src/cli/daily.ts",
+    "scripts/automationPreflightBootstrap.mjs", "src/cli/automationPreflight.ts", "src/cli/automationAbort.ts", "src/cli/finalizationRepairPlan.ts", "src/cli/daily.ts",
     "src/cli/finalize.ts", "src/cli/harness.ts", "src/github/credentials.ts",
     "src/harness/automationReadiness.ts", "src/harness/automationDeploymentIntegrity.ts",
-    "src/scheduler/finalizeDeepDive.ts", "src/scheduler/publicationTransaction.ts", "src/scheduler/runLease.ts"
+    "src/scheduler/finalizeDeepDive.ts", "src/scheduler/finalizationRepairPolicy.ts", "src/scheduler/publicationTransaction.ts", "src/scheduler/runLease.ts"
   ];
   for (const relative of tracked) {
     const file = path.join(projectRoot, relative);
@@ -30,6 +30,7 @@ async function fixture(): Promise<{ projectRoot: string; knowledgeRoot: string; 
   await writeFile(path.join(projectRoot, "package.json"), JSON.stringify({ scripts: {
     "automation-preflight": "node scripts/automationPreflightBootstrap.mjs",
     "automation-abort": "tsx src/cli/automationAbort.ts",
+    "finalization-repair-plan": "tsx src/cli/finalizationRepairPlan.ts",
     daily: "tsx src/cli/daily.ts", finalize: "tsx src/cli/finalize.ts", harness: "tsx src/cli/harness.ts"
   }}));
   await writeFile(path.join(knowledgeRoot, "registry", "learned_repos.json"), JSON.stringify({ learned_count: 0, repos: [] }));

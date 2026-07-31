@@ -16,6 +16,7 @@ const requiredFiles = [
   "schemas/independent-source-judgment.schema.json",
   "scripts/automationPreflightBootstrap.mjs",
   "src/cli/automationAbort.ts",
+  "src/cli/finalizationRepairPlan.ts",
   "src/cli/automationPreflight.ts",
   "src/cli/daily.ts",
   "src/cli/finalize.ts",
@@ -24,6 +25,7 @@ const requiredFiles = [
   "src/harness/automationReadiness.ts",
   "src/harness/automationDeploymentIntegrity.ts",
   "src/scheduler/finalizeDeepDive.ts",
+  "src/scheduler/finalizationRepairPolicy.ts",
   "src/scheduler/publicationTransaction.ts",
   "src/scheduler/runLease.ts"
 ];
@@ -46,6 +48,7 @@ async function writeContract(root: string): Promise<void> {
     scripts: {
       "automation-preflight": "node scripts/automationPreflightBootstrap.mjs",
       "automation-abort": "tsx src/cli/automationAbort.ts",
+      "finalization-repair-plan": "tsx src/cli/finalizationRepairPlan.ts",
       daily: "tsx src/cli/daily.ts",
       finalize: "tsx src/cli/finalize.ts",
       harness: "tsx src/cli/harness.ts"

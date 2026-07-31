@@ -140,6 +140,7 @@ export type RunMetadata = {
   date: string;
   status: "success" | "failed";
   fixture: boolean;
+  tooling_commit?: string;
   extractor_provenance?: {
     requested_mode: string;
     effective_mode: string;

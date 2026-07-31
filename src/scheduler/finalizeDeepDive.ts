@@ -19,6 +19,7 @@ import { validateCardMarkdown, validatePatternMarkdown } from "../harness/patter
 import type { LocalRepoReceipt } from "../deepDive/localRepo";
 import { acquireDailyFileLock } from "./daily";
 import { completeRunLease, inspectRunLease } from "./runLease";
+import { assertToolingAuthorityUnchanged } from "./finalizationRepairPolicy";
 import {
   beginPublicationTransaction,
   finishPublicationTransaction,
@@ -173,6 +174,7 @@ type SourceRun = {
   fixture?: unknown;
   selected_repo?: { repo?: unknown };
   source_snapshot?: unknown;
+  tooling_commit?: unknown;
   automation_lease?: { token?: unknown; started_at?: unknown };
   [key: string]: unknown;
 };
@@ -655,6 +657,10 @@ async function finalizeDeepDiveUnlocked(options: FinalizeDeepDiveOptions): Promi
     knowledgePaths.sourcesDir,
     currentRunPath,
     failedRunPath
+  );
+  await assertToolingAuthorityUnchanged(
+    options.projectRoot,
+    typeof existing.tooling_commit === "string" ? existing.tooling_commit : undefined
   );
   const activeLease = await inspectRunLease(options.projectRoot);
   if (existing.automation_lease) {

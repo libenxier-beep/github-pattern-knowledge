@@ -17,6 +17,9 @@
 - confirm fixture preparation writes a source snapshot and failed/preparation receipt only
 - confirm fixture preparation leaves patterns, routed Work Contexts, cards, indexes, and learned registry unchanged
 - run focused finalization tests when manifest, report, registry, ownership, or value-gate behavior changes
+- confirm a repairable prepublication failure produces a same-run artifact-repair plan, never requests another `daily`, and becomes an abort after three unsuccessful repair rounds
+- confirm source identity, checkout, lease, publication safety, and tooling-authority failures remain immediate aborts
+- confirm preparation records the clean tool commit and finalization rejects both dirty standards and commit drift, even when report artifacts would otherwise pass
 - confirm the positive report case satisfies `docs/human-report-quality-standard.md`: at least one important, non-obvious functional paradigm with a source-observed problem, design choice, causal mechanism, counterfactual importance, benefits, clever move, tradeoffs, authority boundary, and canonical alignment
 - confirm a single strong paradigm can pass without filler units, forced Work Contexts, forced adjacent approaches, forced transfer targets, or prescribed headings
 - confirm negative cases reject missing or malformed core paradigms, supporting implementation details promoted as defining paradigms, shallow reader receipts, source/transfer blur, and unpinned paradigm evidence

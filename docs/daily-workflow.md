@@ -14,6 +14,7 @@ This document is the canonical operating rule for one real GitHub Pattern Knowle
 | Manifest shape and value gates | `src/deepDive/valueFunction.ts` |
 | Report mechanical gates | `src/deepDive/reportReadability.ts` |
 | Publication, provenance, and registry mutation | `src/scheduler/finalizeDeepDive.ts` |
+| Failed-finalization repair classification and immutable tooling authority | `src/scheduler/finalizationRepairPolicy.ts` |
 | Regression behavior | `tests/` and `src/harness/` |
 | Pending-seed progress | `registry/learned_repos.json` compared with `registry/seed_repos.json` |
 | Reader preferences and latest-run projection | bounded automation memory; advisory only |
@@ -91,6 +92,15 @@ npm run finalize -- --manifest /absolute/path/value_manifest.json
 
 Finalization is the only publication seam. Do not hand-edit the learned registry or reinterpret a failed gate as partial success.
 
+If finalization fails before publication on a report, artifact, manifest, ownership, taxonomy, readability, or independent-reader contract, keep the same run and enter a bounded repair loop:
+
+1. Pass the exact error and the next attempt number to `npm run finalization-repair-plan -- --run-id <run-id> --attempt <n> --error "<exact error>"`.
+2. Continue only when its JSON action is `repair_run_artifacts`. Modify only the listed run-owned drafts, audit receipts, and manifest. Correct the answer that failed: revise or reject unsupported units, fix ownership and taxonomy, improve the report, and repeat independent review whenever its reviewed substance changes.
+3. Run `finalize` again against the same run and pinned source. Do not run `daily` again, switch repositories, weaken a gate, or publish partial output.
+4. Allow at most three repair rounds. If the plan says `abort_run`, the budget is exhausted, or the failure concerns source identity, checkout integrity, tooling authority, lease ownership, reviewer availability, or publication transaction safety, abort with the exact error.
+
+The clean tool commit recorded during preparation is immutable for the whole loop. Finalization rejects a dirty tool checkout or a different commit. Standards, tests, schemas, skills, workflow code, automation configuration, canonical registry/indexes, pinned source evidence, and local checkout are never repair targets. A failed learning answer must adapt to the fixed evaluator; the evaluator must not adapt to the answer.
+
 If source analysis, independent review, report construction, or verification stops before finalization, release the active run explicitly:
 
 ```bash
@@ -107,7 +117,7 @@ Only after finalization and all verification succeed may the caller deliver the 
 
 ## Stop Conditions
 
-Stop without claiming learning succeeded when any required checkout, evidence, inventory, reviewer, manifest, report, ownership, publication, test, audit, build, index, harness, or delivery gate fails. Report the exact error and the most likely bounded repair. Retain evidence according to repository lifecycle rules; never delete or relabel evidence merely to make the dashboard appear clean.
+Stop without claiming learning succeeded when any required checkout, evidence, inventory, reviewer, manifest, report, ownership, publication, test, audit, build, index, harness, or delivery gate remains failed after its authorized repair path. A repairable prepublication content gate returns to the bounded same-run repair loop; it does not start a new discovery run. Report the exact error and the most likely bounded repair. Retain evidence according to repository lifecycle rules; never delete or relabel evidence merely to make the dashboard appear clean.
 
 A missing or untracked workflow interface is a deployment failure. Pause the caller, repair and commit the complete repository contract, verify it in a fresh clean checkout, and only then start a new run. Do not repair deployment drift inside an active learning run.
 
