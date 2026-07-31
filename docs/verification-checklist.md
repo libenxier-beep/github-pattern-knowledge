@@ -5,6 +5,7 @@
 - repeat preflight from an identified fresh worktree with both root variables unset; confirm it still reports the canonical Work Context roots, the authoritative registry counts, and the same next pending seed
 - confirm the fresh worktree resolves GitHub authentication through the host `gh` Keychain without copying or printing the token
 - confirm preflight reports Feishu bot readiness, canonical authority writeability, active-run state, and any deterministic publication recovery in the same JSON result
+- confirm the three read-only Work Context readiness checks run as one bounded parallel gate so preflight still emits its single JSON result within the caller window
 - confirm an unidentified checkout with unset roots and a missing or inconsistent registry fails closed before `npm run daily`
 - confirm automation memory is not consulted by code or caller policy for next-seed selection
 - confirm the repository-owned independent-review schema passes its focused API-compatibility test

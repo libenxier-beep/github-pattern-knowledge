@@ -76,9 +76,9 @@ async function defaultWorkContextCheck(workContextsRoot: string): Promise<{ read
     ["lifecycle", ["scripts/audit_artifact_lifecycle.py"]]
   ];
   try {
-    for (const [, args] of checks) {
-      await execFile("python3", args, { cwd: workContextsRoot, timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
-    }
+    await Promise.all(checks.map(([, args]) =>
+      execFile("python3", args, { cwd: workContextsRoot, timeout: 30_000, maxBuffer: 4 * 1024 * 1024 })
+    ));
     return { ready: true, checks: checks.map(([name]) => name) };
   } catch {
     return { ready: false, checks: checks.map(([name]) => name) };
